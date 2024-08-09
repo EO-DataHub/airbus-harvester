@@ -1,6 +1,6 @@
 .PHONY: dockerbuild dockerpush test testonce ruff black lint isort pre-commit-check requirements-update requirements setup
 VERSION ?= latest
-IMAGENAME = CHANGEME
+IMAGENAME = airbus-harvester
 DOCKERREPO ?= public.ecr.aws/n1b3o1k2/ukeodhp
 
 dockerbuild:
@@ -11,7 +11,7 @@ dockerpush: dockerbuild testdocker
 	docker push ${DOCKERREPO}/${IMAGENAME}:${VERSION}
 
 test:
-	./venv/bin/ptw CHANGEME-test-package-names
+	./venv/bin/ptw
 
 testonce:
 	./venv/bin/pytest
