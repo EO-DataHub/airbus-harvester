@@ -192,7 +192,7 @@ def main():
     for raw_data in all_data["features"]:
         data = generate_stac_item(raw_data)
         file_name = f"{str(hash(data))}.json"
-        key = f"{key_root}/airbus_data_example/{file_name}"
+        key = f"{key_root}/{file_name}"
         upload_file_s3(data, args.s3_bucket, key, s3_client)
 
         added_keys.append(key)
