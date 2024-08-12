@@ -55,42 +55,35 @@ def coordinates_to_bbox(coordinates):
     return max_values + min_values
 
 
-def get_stac_collection_summary(all_data):
-    """Gets the area and start/stop times of all data points"""
-    all_coordinates = [x["geometry"]["coordinates"][0][0] for x in all_data]
-    all_start_times = [x["properties"]["startTime"] for x in all_data]
-    all_stop_times = [x["properties"]["stopTime"] for x in all_data]
-
-    bbox = coordinates_to_bbox(all_coordinates)
-
-    return {"bbox": bbox, "start_time": min(all_start_times), "stop_time": max(all_stop_times)}
-
-
-def generate_stac_collection(all_data):
-    summary = get_stac_collection_summary(all_data)
+def generate_stac_entry(data):
+    coordinates = data["geometry"]["coordinates"][0]
+    bbox = coordinates_to_bbox(coordinates)
 
     return f"""{{
   "type": "Collection",
-  "id": "airbus_data_example",
+  "id": "airbus_data_example_{data['properties']['itemId']}",
   "stac_version": "1.0.0",
   "description": "Converted Airbus data",
   "links": [
   ],
   "title": "Airbus Data",
   "geometry": {{
-    "type": "Polygon"
+    "type": "Polygon",
+    "coordinates": [
+        {coordinates}
+    ]
   }},
   "extent": {{
     "spatial": {{
       "bbox": [
-        {summary['bbox']}
+        {bbox}
       ]
     }},
     "temporal": {{
       "interval": [
         [
-          "{summary['start_time']}",
-          "{summary['stop_time']}"
+          "{data['properties']['startTime']}",
+          "{data['properties']['stopTime']}"
         ]
       ]
     }}
@@ -100,47 +93,6 @@ def generate_stac_collection(all_data):
     "airbus"
   ]
 }}"""
-
-
-def generate_stac_item(data):
-    coordinates = data["geometry"]["coordinates"][0]
-    bbox = coordinates_to_bbox(coordinates)
-
-    return f"""{{
-        "type": "Item",
-        "id": "airbus_data_example_{data['properties']['itemId']}",
-        "stac_version": "1.0.0",
-        "description": "Converted Airbus data",
-        "collection": "airbus_data_example",
-        "links": [
-        ],
-        "title": "Airbus Data",
-        "geometry": {{
-        "type": "Polygon",
-        "coordinates": [
-            {coordinates}
-        ]
-        }},
-        "extent": {{
-        "spatial": {{
-          "bbox": [
-            {bbox}
-          ]
-        }},
-        "temporal": {{
-          "interval": [
-            [
-              "{data['properties']['startTime']}",
-              "{data['properties']['stopTime']}"
-            ]
-          ]
-        }}
-        }},
-        "license": "proprietary",
-        "keywords": [
-        "airbus"
-        ]
-    }}"""
 
 
 def make_catalogue():
@@ -184,13 +136,8 @@ def main():
     upload_file_s3(make_catalogue(), args.s3_bucket, key, s3_client)
     added_keys.append(key)
 
-    file_name = "airbus_data_example.json"
-    key = f"{key_root}/{file_name}"
-    upload_file_s3(generate_stac_collection(all_data["features"]), args.s3_bucket, key, s3_client)
-    added_keys.append(key)
-
     for raw_data in all_data["features"]:
-        data = generate_stac_item(raw_data)
+        data = generate_stac_entry(raw_data)
         file_name = f"{str(hash(data))}.json"
         key = f"{key_root}/{file_name}"
         upload_file_s3(data, args.s3_bucket, key, s3_client)
