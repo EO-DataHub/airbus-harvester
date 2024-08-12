@@ -96,6 +96,7 @@ def generate_stac_entry(data):
 
 
 def make_catalogue():
+    """Top level catalogue for Airbus data"""
     return """{
       "type": "Catalog",
       "id": "airbus_data",
