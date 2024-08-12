@@ -132,7 +132,7 @@ def main():
     )
 
     file_name = "airbus.json"
-    key = f"{key_root}/{file_name}"
+    key = f"git-harvester/{file_name}"
     upload_file_s3(make_catalogue(), args.s3_bucket, key, s3_client)
     added_keys.append(key)
 
