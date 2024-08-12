@@ -153,13 +153,13 @@ def main():
     # logging.info(f"Previously harvested URLs not found: {deleted_keys}")
 
     output_data = {
-        "id": f"{args.workspace_name}/{args.source_url}",
+        "id": f"{args.workspace_name}/airbus",
         "workspace": args.workspace_name,
         "bucket_name": args.s3_bucket,
         "added_keys": added_keys,
         "updated_keys": updated_keys,
         "deleted_keys": deleted_keys,
-        "source": args.source_url,
+        "source": "airbus",
         "target": "/",
     }
 
