@@ -58,6 +58,7 @@ def coordinates_to_bbox(coordinates):
 def generate_stac_entry(data):
     coordinates = data["geometry"]["coordinates"][0]
     bbox = coordinates_to_bbox(coordinates)
+
     return f"""{{
   "type": "Collection",
   "id": "airbus_data_example_{data['properties']['itemId']}",
@@ -94,6 +95,16 @@ def generate_stac_entry(data):
 }}"""
 
 
+def make_catalogue():
+    return """{
+      "type": "Catalog",
+      "id": "airbus_data",
+      "stac_version": "1.0.0",
+      "description": "Airbus Datasets",
+      "links": []
+    }"""
+
+
 def main():
     """Harvest a given Airbus catalog, and all records beneath it. Send a pulsar message
     containing all added, updated, and deleted links since the last time the catalog was
@@ -118,6 +129,11 @@ def main():
     all_data = get_catalogue(
         env=os.getenv("ENVIRONMENT", None), limit=os.getenv("NUMBER_OF_ENTRIES", 10)
     )
+
+    file_name = "airbus.json"
+    key = f"{key_root}/{file_name}"
+    upload_file_s3(make_catalogue(), args.s3_bucket, key, s3_client)
+    added_keys.append(key)
 
     for raw_data in all_data["features"]:
         data = generate_stac_entry(raw_data)
