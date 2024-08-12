@@ -99,7 +99,7 @@ def make_catalogue():
     """Top level catalogue for Airbus data"""
     return """{
       "type": "Catalog",
-      "id": "airbus_data",
+      "id": "airbus",
       "stac_version": "1.0.0",
       "description": "Airbus Datasets",
       "links": []
