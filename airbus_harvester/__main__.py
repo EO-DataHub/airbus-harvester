@@ -18,7 +18,7 @@ parser.add_argument("s3_bucket", help="S3 bucket to store harvested data", type=
 logging.basicConfig(level=logging.DEBUG, format="%(message)s")
 
 
-def get_catalogue(env="dev", limit=10):
+def get_catalogue(env="dev", limit=1):
     if env == "prod":
         url = "https://sar.api.oneatlas.airbus.com"
     else:
@@ -73,7 +73,7 @@ def generate_stac_collection(all_data):
   "type": "Collection",
   "id": "airbus_data_example",
   "stac_version": "1.0.0",
-  "description": "Converted Airbus data",
+  "description": "Airbus data",
   "links": [
   ],
   "title": "Airbus Data",
@@ -107,7 +107,7 @@ def generate_stac_item(data):
     bbox = coordinates_to_bbox(coordinates)
 
     return f"""{{
-        "type": "Item",
+        "type": "Feature",
         "id": "airbus_data_example_{data['properties']['itemId']}",
         "stac_version": "1.0.0",
         "description": "Converted Airbus data",
