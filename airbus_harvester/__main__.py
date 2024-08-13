@@ -122,10 +122,10 @@ def generate_stac_item(data):
         "properties": {{
             "datetime": "{data['properties']['startTime']}",
             "start_datetime": "{data['properties']['startTime']}",
-            "end_datetime": "{data['properties']['stopTime']}"
+            "end_datetime": "{data['properties']['stopTime']}",
             "access": [
                 "HTTPServer"
-            ],
+            ]
         }},
         "links": [],
         "assets": {{}}
