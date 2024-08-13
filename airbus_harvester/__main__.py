@@ -120,8 +120,8 @@ def generate_stac_item(data):
         }},
         "bbox": {bbox},
         "properties": {{
-            "datetime": {data['properties']['startTime']}",
-            "start_datetime": {data['properties']['startTime']}",
+            "datetime": "{data['properties']['startTime']}",
+            "start_datetime": "{data['properties']['startTime']}",
             "end_datetime": "{data['properties']['stopTime']}"
             "access": [
                 "HTTPServer"
