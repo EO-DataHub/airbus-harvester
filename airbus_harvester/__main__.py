@@ -166,7 +166,7 @@ def main():
 
     key_root = (
         f"git-harvester/supported-data/{args.workspace_name}/UKEODHP/"
-        f"catalogue-supported-data/main/collections/airbus"
+        f"catalogue-supported-data/main/airbus"
     )
 
     all_data = get_catalogue(
