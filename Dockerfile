@@ -15,4 +15,4 @@ ADD airbus_harvester ./airbus_harvester/
 ADD pyproject.toml ./
 RUN --mount=type=cache,target=/root/.cache/pip pip3 install -r requirements.txt .
 
-CMD python -m airbus_harvester
+ENTRYPOINT ["python", "-m", "airbus_harvester"]
