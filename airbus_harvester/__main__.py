@@ -176,7 +176,7 @@ def main():
     key_root = "git-harvester/airbus"
 
     all_data = get_catalogue(
-        env=os.getenv("ENVIRONMENT", None), limit=os.getenv("NUMBER_OF_ENTRIES", 10)
+        env=os.getenv("ENVIRONMENT", None), limit=os.getenv("NUMBER_OF_ENTRIES", 1)
     )
 
     file_name = "airbus.json"
