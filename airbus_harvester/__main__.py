@@ -164,14 +164,14 @@ def main():
     updated_keys = []
     deleted_keys = []
 
-    key_root = "git-harvester/supported-data/airbus"
+    key_root = "git-harvester/airbus"
 
     all_data = get_catalogue(
         env=os.getenv("ENVIRONMENT", None), limit=int(os.getenv("NUMBER_OF_ENTRIES", 1))
     )
 
     file_name = "airbus.json"
-    key = f"git-harvester/supported-data/{file_name}"
+    key = f"git-harvester/{file_name}"
     upload_file_s3(make_catalogue(), args.s3_bucket, key, s3_client)
     added_keys.append(key)
 
