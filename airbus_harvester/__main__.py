@@ -67,6 +67,7 @@ def get_stac_collection_summary(all_data):
 
 
 def generate_stac_collection(all_data):
+    """Top level collection for Airbus data"""
     summary = get_stac_collection_summary(all_data)
 
     return f"""{{
@@ -103,6 +104,7 @@ def generate_stac_collection(all_data):
 
 
 def generate_stac_item(data):
+    """Catalogue items for Airbus data"""
     coordinates = data["geometry"]["coordinates"][0]
     bbox = coordinates_to_bbox(coordinates)
 
@@ -193,6 +195,9 @@ def main():
         topic="harvested", producer_name="stac_harvester/airbus"
     )
     logging.info("Harvesting from Airbus")
+
+    # Adapted from other collection code. Keeping this in but commented out for now in case something
+    # similar should be used here
 
     # for url in url_list:
     #     logging.info(f"Parsing URL: {url}")
