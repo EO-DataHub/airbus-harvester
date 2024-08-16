@@ -15,7 +15,12 @@ parser.add_argument("catalog", help="Path of the STAC catalog", type=str)
 parser.add_argument("s3_bucket", help="S3 bucket to store harvested data", type=str)
 
 
-logging.basicConfig(level=logging.DEBUG, format="%(message)s")
+logging.basicConfig(
+    level=logging.DEBUG if os.getenv("DEBUG") else logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[logging.StreamHandler()],
+)
 
 
 def get_catalogue(env="dev", limit=1):
