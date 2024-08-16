@@ -8,11 +8,11 @@ attrs==24.2.0
     # via
     #   jsonschema
     #   referencing
-boto3==1.34.157
+boto3==1.34.162
     # via
     #   Airbus-Harvester (pyproject.toml)
     #   eodhp-utils
-botocore==1.34.157
+botocore==1.34.162
     # via
     #   Airbus-Harvester (pyproject.toml)
     #   boto3
@@ -24,6 +24,8 @@ certifi==2024.7.4
     #   requests
 charset-normalizer==3.3.2
     # via requests
+click==8.1.7
+    # via Airbus-Harvester (pyproject.toml)
 eodhp-utils @ git+https://github.com/EO-DataHub/eodhp-utils.git@v0.1.1
     # via Airbus-Harvester (pyproject.toml)
 idna==3.7

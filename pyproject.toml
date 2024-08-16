@@ -67,6 +67,7 @@ dependencies = [
     "pulsar-client",
     "boto3",
     "botocore",
+    "click",
     "pystac-client",
     "pystac",
     "eodhp-utils @ git+https://github.com/EO-DataHub/eodhp-utils.git@v0.1.1",

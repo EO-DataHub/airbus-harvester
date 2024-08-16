@@ -1,19 +1,12 @@
-import argparse
 import json
 import logging
 import os
 
 import boto3
+import click
 import requests
 from eodhp_utils.aws.s3 import upload_file_s3
 from pulsar import Client as PulsarClient
-
-parser = argparse.ArgumentParser()
-# parser.add_argument("source_url", help="URL of STAC catalog or collection to harvest", type=str)
-parser.add_argument("workspace_name", help="Name of the workspace", type=str)
-parser.add_argument("catalog", help="Path of the STAC catalog", type=str)
-parser.add_argument("s3_bucket", help="S3 bucket to store harvested data", type=str)
-
 
 logging.basicConfig(
     level=logging.DEBUG if os.getenv("DEBUG") else logging.INFO,
@@ -150,7 +143,15 @@ def make_catalogue():
     }"""
 
 
-def main():
+@click.command()
+# not currently used but keeping the same structure as the other harvester repos
+# @click.option("source_url", type=str, nargs=1)
+@click.argument("workspace_name", type=str, nargs=1)
+@click.argument(
+    "catalog", type=str, nargs=1
+)  # not currently used but keeping the same structure as the other harvester repos
+@click.argument("s3_bucket", type=str, nargs=1)
+def main(workspace_name, catalog, s3_bucket):
     """Harvest a given Airbus catalog, and all records beneath it. Send a pulsar message
     containing all added, updated, and deleted links since the last time the catalog was
     harvested"""
@@ -164,7 +165,6 @@ def main():
     else:
         s3_client = boto3.client("s3")
 
-    args = parser.parse_args()
     added_keys = []
     updated_keys = []
     deleted_keys = []
@@ -177,19 +177,19 @@ def main():
 
     file_name = "airbus.json"
     key = f"git-harvester/{file_name}"
-    upload_file_s3(make_catalogue(), args.s3_bucket, key, s3_client)
+    upload_file_s3(make_catalogue(), s3_bucket, key, s3_client)
     added_keys.append(key)
 
     file_name = "airbus_data_example.json"
     key = f"{key_root}/{file_name}"
-    upload_file_s3(generate_stac_collection(all_data["features"]), args.s3_bucket, key, s3_client)
+    upload_file_s3(generate_stac_collection(all_data["features"]), s3_bucket, key, s3_client)
     added_keys.append(key)
 
     for raw_data in all_data["features"]:
         data = generate_stac_item(raw_data)
         file_name = f"{str(hash(data))}.json"
         key = f"{key_root}/airbus_data_example/{file_name}"
-        upload_file_s3(data, args.s3_bucket, key, s3_client)
+        upload_file_s3(data, s3_bucket, key, s3_client)
 
         added_keys.append(key)
 
@@ -222,9 +222,9 @@ def main():
     # logging.info(f"Previously harvested URLs not found: {deleted_keys}")
 
     output_data = {
-        "id": f"{args.workspace_name}/airbus",
-        "workspace": args.workspace_name,
-        "bucket_name": args.s3_bucket,
+        "id": f"{workspace_name}/airbus",
+        "workspace": workspace_name,
+        "bucket_name": s3_bucket,
         "added_keys": added_keys,
         "updated_keys": updated_keys,
         "deleted_keys": deleted_keys,
