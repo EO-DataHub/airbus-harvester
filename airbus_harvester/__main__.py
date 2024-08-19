@@ -16,6 +16,116 @@ logging.basicConfig(
 )
 
 
+@click.group()
+# you can implement any global flags here that will apply to all commands, e.g. debug
+# @click.option('--debug/--no-debug', default=False) # don't feel the need to implement this, just an example
+def cli():
+    """This is just a placeholder to act as the entrypoint, you can do things with global options here
+    if required"""
+    pass
+
+
+@cli.command()
+# not currently used but keeping the same structure as the other harvester repos
+# @click.argument("source_url", type=str, nargs=1)
+@click.argument("workspace_name", type=str)
+@click.argument(
+    "catalog", type=str
+)  # not currently used but keeping the same structure as the other harvester repos
+@click.argument("s3_bucket", type=str)
+def harvest(workspace_name: str, catalog: str, s3_bucket: str):
+    """Harvest a given Airbus catalog, and all records beneath it. Send a pulsar message
+    containing all added, updated, and deleted links since the last time the catalog was
+    harvested"""
+
+    if os.getenv("AWS_ACCESS_KEY") and os.getenv("AWS_SECRET_ACCESS_KEY"):
+        session = boto3.session.Session(
+            aws_access_key_id=os.environ["AWS_ACCESS_KEY"],
+            aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
+        )
+        s3_client = session.client("s3")
+    else:
+        s3_client = boto3.client("s3")
+
+    added_keys = []
+    updated_keys = []
+    deleted_keys = []
+
+    key_root = "git-harvester/supported-datasets/airbus"
+
+    all_data = get_catalogue(
+        env=os.getenv("ENVIRONMENT", None), limit=int(os.getenv("NUMBER_OF_ENTRIES", 1))
+    )
+
+    file_name = "airbus.json"
+    key = f"git-harvester/supported-datasets/{file_name}"
+    upload_file_s3(make_catalogue(), s3_bucket, key, s3_client)
+    added_keys.append(key)
+
+    file_name = "airbus_data_example.json"
+    key = f"{key_root}/{file_name}"
+    upload_file_s3(generate_stac_collection(all_data["features"]), s3_bucket, key, s3_client)
+    added_keys.append(key)
+
+    for raw_data in all_data["features"]:
+        data = generate_stac_item(raw_data)
+        file_name = f"{raw_data['properties']['itemId']}.json"
+        key = f"{key_root}/airbus_data_example/{file_name}"
+        upload_file_s3(data, s3_bucket, key, s3_client)
+
+        added_keys.append(key)
+
+    pulsar_url = os.environ.get("PULSAR_URL")
+    pulsar_client = PulsarClient(pulsar_url)
+
+    producer = pulsar_client.create_producer(
+        topic="harvested", producer_name="stac_harvester/airbus"
+    )
+    logging.info("Harvesting from Airbus")
+
+    # Adapted from other collection code. Keeping this in but commented out for now in case something
+    # similar should be used here
+
+    # for url in url_list:
+    #     logging.info(f"Parsing URL: {url}")
+    #     file_hash = get_file_hash(url)
+    #
+    #     previous_hash = previously_harvested.pop(url, None)
+    #     if not previous_hash:
+    #         # URL was not harvested previously
+    #         logging.info("Appended URL to 'added' list")
+    #         added_keys.append(url)
+    #     elif previous_hash != file_hash:
+    #         # URL has changed since last run
+    #         logging.info("Appended URL to 'updated' list")
+    #         updated_keys.append(url)
+    #     latest_harvested[url] = file_hash
+    #
+    # logging.info(f"Previously harvested URLs not found: {deleted_keys}")
+
+    output_data = {
+        "id": f"{workspace_name}/airbus",
+        "workspace": workspace_name,
+        "bucket_name": s3_bucket,
+        "added_keys": added_keys,
+        "updated_keys": updated_keys,
+        "deleted_keys": deleted_keys,
+        "source": "airbus",
+        "target": "/",
+    }
+
+    if any([added_keys, updated_keys, deleted_keys]):
+        # Send Pulsar message containing harvested links
+        producer.send((json.dumps(output_data)).encode("utf-8"))
+        logging.info(f"Sent harvested message {output_data}")
+    else:
+        logging.info("No changes made to previously harvested state")
+
+    logging.info(output_data)
+
+    return output_data
+
+
 def get_catalogue(env="dev", limit=1):
     if env == "prod":
         url = "https://sar.api.oneatlas.airbus.com"
@@ -141,116 +251,6 @@ def make_catalogue():
       "description": "Airbus Datasets",
       "links": []
     }"""
-
-
-@click.group()
-# you can implement any global flags here that will apply to all commands, e.g. debug
-# @click.option('--debug/--no-debug', default=False) # don't feel the need to implement this, just an example
-def cli():
-    """This is just a placeholder to act as the entrypoint, you can do things with global options here
-    if required"""
-    pass
-
-
-@cli.command()
-# not currently used but keeping the same structure as the other harvester repos
-# @click.argument("source_url", type=str, nargs=1)
-@click.argument("workspace_name", type=str)
-@click.argument(
-    "catalog", type=str
-)  # not currently used but keeping the same structure as the other harvester repos
-@click.argument("s3_bucket", type=str)
-def harvest(workspace_name: str, catalog: str, s3_bucket: str):
-    """Harvest a given Airbus catalog, and all records beneath it. Send a pulsar message
-    containing all added, updated, and deleted links since the last time the catalog was
-    harvested"""
-
-    if os.getenv("AWS_ACCESS_KEY") and os.getenv("AWS_SECRET_ACCESS_KEY"):
-        session = boto3.session.Session(
-            aws_access_key_id=os.environ["AWS_ACCESS_KEY"],
-            aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
-        )
-        s3_client = session.client("s3")
-    else:
-        s3_client = boto3.client("s3")
-
-    added_keys = []
-    updated_keys = []
-    deleted_keys = []
-
-    key_root = "git-harvester/supported-datasets/airbus"
-
-    all_data = get_catalogue(
-        env=os.getenv("ENVIRONMENT", None), limit=int(os.getenv("NUMBER_OF_ENTRIES", 1))
-    )
-
-    file_name = "airbus.json"
-    key = f"git-harvester/supported-datasets/{file_name}"
-    upload_file_s3(make_catalogue(), s3_bucket, key, s3_client)
-    added_keys.append(key)
-
-    file_name = "airbus_data_example.json"
-    key = f"{key_root}/{file_name}"
-    upload_file_s3(generate_stac_collection(all_data["features"]), s3_bucket, key, s3_client)
-    added_keys.append(key)
-
-    for raw_data in all_data["features"]:
-        data = generate_stac_item(raw_data)
-        file_name = f"{raw_data['properties']['itemId']}.json"
-        key = f"{key_root}/airbus_data_example/{file_name}"
-        upload_file_s3(data, s3_bucket, key, s3_client)
-
-        added_keys.append(key)
-
-    pulsar_url = os.environ.get("PULSAR_URL")
-    pulsar_client = PulsarClient(pulsar_url)
-
-    producer = pulsar_client.create_producer(
-        topic="harvested", producer_name="stac_harvester/airbus"
-    )
-    logging.info("Harvesting from Airbus")
-
-    # Adapted from other collection code. Keeping this in but commented out for now in case something
-    # similar should be used here
-
-    # for url in url_list:
-    #     logging.info(f"Parsing URL: {url}")
-    #     file_hash = get_file_hash(url)
-    #
-    #     previous_hash = previously_harvested.pop(url, None)
-    #     if not previous_hash:
-    #         # URL was not harvested previously
-    #         logging.info("Appended URL to 'added' list")
-    #         added_keys.append(url)
-    #     elif previous_hash != file_hash:
-    #         # URL has changed since last run
-    #         logging.info("Appended URL to 'updated' list")
-    #         updated_keys.append(url)
-    #     latest_harvested[url] = file_hash
-    #
-    # logging.info(f"Previously harvested URLs not found: {deleted_keys}")
-
-    output_data = {
-        "id": f"{workspace_name}/airbus",
-        "workspace": workspace_name,
-        "bucket_name": s3_bucket,
-        "added_keys": added_keys,
-        "updated_keys": updated_keys,
-        "deleted_keys": deleted_keys,
-        "source": "airbus",
-        "target": "/",
-    }
-
-    if any([added_keys, updated_keys, deleted_keys]):
-        # Send Pulsar message containing harvested links
-        producer.send((json.dumps(output_data)).encode("utf-8"))
-        logging.info(f"Sent harvested message {output_data}")
-    else:
-        logging.info("No changes made to previously harvested state")
-
-    logging.info(output_data)
-
-    return output_data
 
 
 if __name__ == "__main__":
