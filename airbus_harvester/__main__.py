@@ -143,15 +143,24 @@ def make_catalogue():
     }"""
 
 
-@click.command()
+@click.group()
+# you can implement any global flags here that will apply to all commands, e.g. debug
+# @click.option('--debug/--no-debug', default=False) # don't feel the need to implement this, just an example
+def cli():
+    """This is just a placeholder to act as the entrypoint, you can do things with global options here
+    if required"""
+    pass
+
+
+@cli.command()
 # not currently used but keeping the same structure as the other harvester repos
-# @click.option("source_url", type=str, nargs=1)
-@click.argument("workspace_name", type=str, nargs=1)
+# @click.argument("source_url", type=str, nargs=1)
+@click.argument("workspace_name", type=str)
 @click.argument(
-    "catalog", type=str, nargs=1
+    "catalog", type=str
 )  # not currently used but keeping the same structure as the other harvester repos
-@click.argument("s3_bucket", type=str, nargs=1)
-def main(workspace_name, catalog, s3_bucket):
+@click.argument("s3_bucket", type=str)
+def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     """Harvest a given Airbus catalog, and all records beneath it. Send a pulsar message
     containing all added, updated, and deleted links since the last time the catalog was
     harvested"""
@@ -187,7 +196,7 @@ def main(workspace_name, catalog, s3_bucket):
 
     for raw_data in all_data["features"]:
         data = generate_stac_item(raw_data)
-        file_name = f"{str(hash(data))}.json"
+        file_name = f"{raw_data['properties']['itemId']}.json"
         key = f"{key_root}/airbus_data_example/{file_name}"
         upload_file_s3(data, s3_bucket, key, s3_client)
 
@@ -245,4 +254,4 @@ def main(workspace_name, catalog, s3_bucket):
 
 
 if __name__ == "__main__":
-    main()
+    cli(obj={})
