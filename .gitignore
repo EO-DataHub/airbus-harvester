@@ -120,6 +120,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
+.make-venv-installed
 .env
 .venv
 env/
@@ -160,6 +161,7 @@ cython_debug/
 #.idea/
 #
 
-
 *.bak
 
+# Configuration files
+.pre-commit-config.yaml
