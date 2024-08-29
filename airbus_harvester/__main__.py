@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 
 import boto3
 import click
@@ -62,15 +63,15 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     upload_file_s3(make_catalogue(), s3_bucket, key, s3_client)
     added_keys.append(key)
 
-    file_name = "airbus_data_example.json"
+    file_name = "airbus_sar_data.json"
     key = f"{key_root}/{file_name}"
     upload_file_s3(generate_stac_collection(all_data["features"]), s3_bucket, key, s3_client)
     added_keys.append(key)
 
     for raw_data in all_data["features"]:
         data = generate_stac_item(raw_data)
-        file_name = f"{raw_data['properties']['itemId']}.json"
-        key = f"{key_root}/airbus_data_example/{file_name}"
+        file_name = f"{raw_data['properties']['acquisitionId']}.json"
+        key = f"{key_root}/airbus_sar_data/{file_name}"
         upload_file_s3(data, s3_bucket, key, s3_client)
 
         added_keys.append(key)
@@ -178,37 +179,66 @@ def generate_stac_collection(all_data):
     """Top level collection for Airbus data"""
     summary = get_stac_collection_summary(all_data)
 
-    return f"""{{
-  "type": "Collection",
-  "id": "airbus_data_example",
-  "stac_version": "1.0.0",
-  "description": "Airbus data",
-  "links": [
-  ],
-  "title": "Airbus Data",
-  "geometry": {{
-    "type": "Polygon"
-  }},
-  "extent": {{
-    "spatial": {{
-      "bbox": [
-        {summary['bbox']}
-      ]
-    }},
-    "temporal": {{
-      "interval": [
-        [
-          "{summary['start_time']}",
-          "{summary['stop_time']}"
-        ]
-      ]
-    }}
-  }},
-  "license": "proprietary",
-  "keywords": [
-    "airbus"
-  ]
-}}"""
+    stac_collection = {
+        "type": "Collection",
+        "id": "airbus_sar_data",
+        "stac_version": "1.0.0",
+        "description": "Airbus SAR data",
+        "links": [],
+        "title": "Airbus SAR Data",
+        "geometry": {"type": "Polygon"},
+        "extent": {
+            "spatial": {"bbox": summary["bbox"]},
+            "temporal": {"interval": [summary["start_time"], summary["stop_time"]]},
+        },
+        "license": "proprietary",
+        "keywords": ["airbus"],
+    }
+    return json.dumps(stac_collection, indent=4)
+
+
+def handle_quicklook_url(data, links, assets, mapped_keys):
+    """Convert quicklook URL to thumbnail asset"""
+    mime_types = {
+        ".tiff": "image/tiff; application=geotiff; profile=cloud-optimized",
+        ".tif": "image/tiff; application=geotiff; profile=cloud-optimized",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+    }
+
+    if "quicklookUrl" in data["properties"]:
+        quicklook_url = data["properties"]["quicklookUrl"]
+        file_extension = os.path.splitext(quicklook_url)[1].lower()
+        mime_type = mime_types.get(file_extension, "application/octet-stream")
+        links.append(
+            {
+                "rel": "thumbnail",
+                "href": data["properties"]["quicklookUrl"],
+                "type": mime_type,
+            }
+        )
+        assets["thumbnail"] = {
+            "href": data["properties"]["quicklookUrl"],
+            "type": mime_type,
+        }
+        mapped_keys.add("quicklookUrl")
+
+
+def modify_value(key, value):
+    """Modify a specific value to STAC format depending on the key"""
+    if key == "lookDirection":
+        # Convert look direction to human readable format
+        return "right" if value == "R" else "left" if value == "L" else value
+    elif key == "polarizationChannels":
+        # Split dual polarisation channels into separate values
+        return [value[i : i + 2] for i in range(0, len(value), 2)]
+    return value
+
+
+def camel_to_snake(name):
+    """Convert camelCase to snake_case."""
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
 
 
 def generate_stac_item(data):
@@ -216,41 +246,67 @@ def generate_stac_item(data):
     coordinates = data["geometry"]["coordinates"][0]
     bbox = coordinates_to_bbox(coordinates)
 
-    return f"""{{
+    mapped_keys = set()
+    properties = {}
+    links = []
+    assets = {}
+
+    def map_if_exists(key, source_key):
+        if source_key in data["properties"]:
+            properties[key] = modify_value(source_key, data["properties"][source_key])
+            mapped_keys.add(source_key)
+
+    map_if_exists("datetime", "catalogueTime")
+    map_if_exists("start_datetime", "startTime")
+    map_if_exists("end_datetime", "stopTime")
+    map_if_exists("updated", "lastUpdateTime")
+    map_if_exists("sar:instrument_mode", "sensorMode")
+    map_if_exists("sar:polarizations", "polarizationChannels")
+    map_if_exists("sar:observation_direction", "lookDirection")
+    map_if_exists("sar:product_type", "productType")
+    map_if_exists("sat:platform_international_designator", "satellite")
+    map_if_exists("sat:orbit_state", "pathDirection")
+    map_if_exists("sat:relative_orbit", "relativeOrbit")
+    map_if_exists("sat:absolute_orbit", "absoluteOrbit")
+    properties["access"] = ["HTTPServer"]
+    properties["sar:frequency_band"] = "X"
+    properties["sar:center_frequency"] = 9.65
+
+    handle_quicklook_url(data, links, assets, mapped_keys)
+
+    for key, value in data["properties"].items():
+        if key not in mapped_keys and value is not None:
+            properties[camel_to_snake(key)] = value
+
+    stac_item = {
         "type": "Feature",
         "stac_version": "1.0.0",
-        "stac_extensions": [],
-        "id": "airbus_data_example_{data['properties']['itemId']}",
-        "collection": "airbus_data_example",
-        "geometry": {{
-            "type": "Polygon",
-            "coordinates": [
-                {coordinates}
-            ]
-        }},
-        "bbox": {bbox},
-        "properties": {{
-            "datetime": "{data['properties']['catalogueTime']}",
-            "start_datetime": "{data['properties']['startTime']}",
-            "end_datetime": "{data['properties']['stopTime']}",
-            "access": [
-                "HTTPServer"
-            ]
-        }},
-        "links": [],
-        "assets": {{}}
-    }}"""
+        "stac_extensions": [
+            "https://stac-extensions.github.io/sar/v1.0.0/schema.json",
+            "https://stac-extensions.github.io/sat/v1.0.0/schema.json",
+        ],
+        "id": data["properties"]["acquisitionId"],
+        "collection": "airbus_sar_data",
+        "geometry": {"type": "Polygon", "coordinates": [coordinates]},
+        "bbox": bbox,
+        "properties": properties,
+        "links": links,
+        "assets": assets,
+    }
+
+    return json.dumps(stac_item, indent=4)
 
 
 def make_catalogue():
     """Top level catalogue for Airbus data"""
-    return """{
-      "type": "Catalog",
-      "id": "airbus",
-      "stac_version": "1.0.0",
-      "description": "Airbus Datasets",
-      "links": []
-    }"""
+    stac_catalog = {
+        "type": "Catalog",
+        "id": "airbus",
+        "stac_version": "1.0.0",
+        "description": "Airbus Datasets",
+        "links": [],
+    }
+    return json.dumps(stac_catalog, indent=4)
 
 
 if __name__ == "__main__":
