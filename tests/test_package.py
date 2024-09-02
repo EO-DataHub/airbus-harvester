@@ -90,23 +90,10 @@ def test_harvest(mock_create_client, requests_mock, mock_response):
         "https://dev.sar.api.oneatlas.airbus.com/v1/sar/catalogue", text=json.dumps(mock_response)
     )
 
-    def printme():
-        print("jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj")
-
     mock_client = mock.MagicMock()
     mock_producer = mock.MagicMock()
-
-    # Set up the mock client to return the mock producer
     mock_create_client.return_value = mock_client
     mock_client.create_producer.return_value = mock_producer
-
-    # mock_pulsar_producer = mock.MagicMock(name="producer")
-    # mock_pulsar_producer.send = Mock(name="send", side_effect=printme)
-    # mock_pulsar_producer.send.return_value = "£££££££££££££££££££££££££"
-
-    # mock_pulsar_client = mock.Mock()
-    # mock_pulsar_client.create_producer = mock.Mock(return_value=mock_pulsar_producer)
-    # mock_pulsar_client.create_producer.return_value = mock_pulsar_producer
 
     bucket_name = "my-bucket"
 
@@ -114,11 +101,6 @@ def test_harvest(mock_create_client, requests_mock, mock_response):
     s3.create_bucket(Bucket=bucket_name)
 
     os.environ["PULSAR_URL"] = "mypulsar.com/pulsar"
-    # with mock.patch(
-    #         # "pulsar.Client", mock_pulsar_client
-    #         "airbus_harvester.__main__.PulsarClient", mock_pulsar_client
-    # ):
-    # result = harvest('a', 'b', 'c')
 
     runner = CliRunner()
     runner.invoke(harvest, f"workspace catalogue {bucket_name}".split())
@@ -129,7 +111,6 @@ def test_harvest(mock_create_client, requests_mock, mock_response):
     assert len(list(my_bucket.objects.all())) == 3
 
     args, kwargs = mock_producer.send.call_args
-
     call_args = json.loads(args[0])
     assert {
         "id",
