@@ -14,7 +14,7 @@
 
 [project]
 name = "Airbus-Harvester"
-version = "0.1.0"
+version = "0.1.1"
 description = "Harvest Airbus data"
 readme = "README.md"
 
