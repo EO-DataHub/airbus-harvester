@@ -1,7 +1,13 @@
 import json
+import os
+from unittest import mock
+from unittest.mock import patch
 
+import boto3
+import moto
 import pytest
 import requests
+from click.testing import CliRunner
 
 from airbus_harvester.__main__ import (
     coordinates_to_bbox,
@@ -10,6 +16,7 @@ from airbus_harvester.__main__ import (
     get_catalogue,
     get_stac_collection_summary,
     handle_quicklook_url,
+    harvest,
     make_catalogue,
     modify_value,
 )
@@ -74,6 +81,69 @@ def mock_response():
         ],
         "bbox": [-28.1373002, 38.5878242, -27.9837603, 38.7135605],
     }
+
+
+@moto.mock_aws
+@patch("airbus_harvester.__main__.PulsarClient")
+def test_harvest(mock_create_client, requests_mock, mock_response):
+    requests_mock.post(
+        "https://dev.sar.api.oneatlas.airbus.com/v1/sar/catalogue", text=json.dumps(mock_response)
+    )
+
+    def printme():
+        print("jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj")
+
+    mock_client = mock.MagicMock()
+    mock_producer = mock.MagicMock()
+
+    # Set up the mock client to return the mock producer
+    mock_create_client.return_value = mock_client
+    mock_client.create_producer.return_value = mock_producer
+
+    # mock_pulsar_producer = mock.MagicMock(name="producer")
+    # mock_pulsar_producer.send = Mock(name="send", side_effect=printme)
+    # mock_pulsar_producer.send.return_value = "£££££££££££££££££££££££££"
+
+    # mock_pulsar_client = mock.Mock()
+    # mock_pulsar_client.create_producer = mock.Mock(return_value=mock_pulsar_producer)
+    # mock_pulsar_client.create_producer.return_value = mock_pulsar_producer
+
+    bucket_name = "my-bucket"
+
+    s3 = boto3.resource("s3", region_name="us-east-1")
+    s3.create_bucket(Bucket=bucket_name)
+
+    os.environ["PULSAR_URL"] = "mypulsar.com/pulsar"
+    # with mock.patch(
+    #         # "pulsar.Client", mock_pulsar_client
+    #         "airbus_harvester.__main__.PulsarClient", mock_pulsar_client
+    # ):
+    # result = harvest('a', 'b', 'c')
+
+    runner = CliRunner()
+    runner.invoke(harvest, f"workspace catalogue {bucket_name}".split())
+
+    s3 = boto3.resource("s3")
+    my_bucket = s3.Bucket(bucket_name)
+
+    assert len(list(my_bucket.objects.all())) == 3
+
+    args, kwargs = mock_producer.send.call_args
+
+    call_args = json.loads(args[0])
+    assert {
+        "id",
+        "workspace",
+        "bucket_name",
+        "added_keys",
+        "updated_keys",
+        "deleted_keys",
+        "source",
+        "target",
+    }.issubset(call_args.keys())
+    assert call_args["bucket_name"] == bucket_name
+    assert len(call_args["added_keys"]) == 3
+    assert len(call_args["updated_keys"]) == len(call_args["deleted_keys"]) == 0
 
 
 def test_get_catalogue__success(requests_mock, mock_response):
