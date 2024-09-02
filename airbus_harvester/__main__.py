@@ -1,12 +1,12 @@
 import json
 import logging
 import os
-import re
 
 import boto3
 import click
 import requests
 from eodhp_utils.aws.s3 import upload_file_s3
+from inflection import underscore
 from pulsar import Client as PulsarClient
 
 logging.basicConfig(
@@ -258,8 +258,7 @@ def handle_quicklook_url(data, links, assets, mapped_keys):
         ".png": "image/png",
     }
 
-    if "quicklookUrl" in data["properties"]:
-        quicklook_url = data["properties"]["quicklookUrl"]
+    if quicklook_url := data["properties"].get("quicklookUrl"):
         file_extension = os.path.splitext(quicklook_url)[1].lower()
         mime_type = mime_types.get(file_extension, "application/octet-stream")
         links.append(
@@ -287,18 +286,14 @@ def modify_value(key, value):
     return value
 
 
-def camel_to_snake(name):
-    """Convert camelCase to snake_case."""
-    return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
-
-
 def generate_stac_item(data):
     """Catalogue items for Airbus data"""
     coordinates = data["geometry"]["coordinates"][0]
     bbox = coordinates_to_bbox(coordinates)
 
     mapped_keys = set()
-    properties = {}
+    properties = {"access": ["HTTPServer"], "sar:frequency_band": "X", "sar:center_frequency": 9.65}
+
     links = []
     assets = {}
 
@@ -319,15 +314,12 @@ def generate_stac_item(data):
     map_if_exists("sat:orbit_state", "pathDirection")
     map_if_exists("sat:relative_orbit", "relativeOrbit")
     map_if_exists("sat:absolute_orbit", "absoluteOrbit")
-    properties["access"] = ["HTTPServer"]
-    properties["sar:frequency_band"] = "X"
-    properties["sar:center_frequency"] = 9.65
 
     handle_quicklook_url(data, links, assets, mapped_keys)
 
     for key, value in data["properties"].items():
         if key not in mapped_keys and value is not None:
-            properties[camel_to_snake(key)] = value
+            properties[underscore(key)] = value
 
     stac_item = {
         "type": "Feature",

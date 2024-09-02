@@ -70,6 +70,7 @@ dependencies = [
     "click",
     "pystac-client",
     "pystac",
+    "inflection",
     "eodhp-utils @ git+https://github.com/EO-DataHub/eodhp-utils.git@v0.1.1",
 ]
 

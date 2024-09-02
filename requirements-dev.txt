@@ -47,6 +47,8 @@ identify==2.6.0
     # via pre-commit
 idna==3.7
     # via requests
+inflection==0.5.1
+    # via Airbus-Harvester (pyproject.toml)
 iniconfig==2.0.0
     # via pytest
 isort==5.13.2
