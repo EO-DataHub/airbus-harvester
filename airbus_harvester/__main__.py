@@ -279,7 +279,7 @@ def modify_value(key, value):
     """Modify a specific value to STAC format depending on the key"""
     if key == "lookDirection":
         # Convert look direction to human readable format
-        return "right" if value == "R" else "left" if value == "L" else value
+        return "right" if value.upper() == "R" else "left" if value.upper() == "L" else value
     elif key == "polarizationChannels":
         # Split dual polarisation channels into separate values
         return [value[i : i + 2] for i in range(0, len(value), 2)]
