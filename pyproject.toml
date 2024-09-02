@@ -14,7 +14,7 @@
 
 [project]
 name = "Airbus-Harvester"
-version = "0.1.0"
+version = "0.1.1"
 description = "Harvest Airbus data"
 readme = "README.md"
 
@@ -70,6 +70,7 @@ dependencies = [
     "click",
     "pystac-client",
     "pystac",
+    "inflection",
     "eodhp-utils @ git+https://github.com/EO-DataHub/eodhp-utils.git@v0.1.1",
 ]
 
@@ -82,7 +83,7 @@ dependencies = [
 # Similar to `dependencies` above, these must be valid existing
 # projects.
 [project.optional-dependencies] # Optional
-dev = ["pip-tools", "pytest", "pytest-xdist", "pytest-mock", "pytest-watcher", "black", "ruff", "isort", "pre-commit"]
+dev = ["pip-tools", "pytest", "pytest-xdist", "pytest-mock", "pytest-watcher", "black", "ruff", "isort", "pre-commit", "requests-mock", "moto"]
 
 # List URLs that are relevant to your project
 #
