@@ -186,6 +186,7 @@ def generate_stac_collection(all_data):
         "stac_extensions": [
             "https://stac-extensions.github.io/sar/v1.0.0/schema.json",
             "https://stac-extensions.github.io/sat/v1.0.0/schema.json",
+            "https://stac-extensions.github.io/render/v1.0.0/schema.json",
         ],
         "description": (
             "The German TerraSAR-X / TanDEM-X satellite formation and the Spanish PAZ satellite "
@@ -203,6 +204,7 @@ def generate_stac_collection(all_data):
             "temporal": {"interval": [[summary["start_time"], summary["stop_time"]]]},
         },
         "license": "proprietary",
+        "renders": {"visual": {"title": "Visual Image", "assets": ["visual"]}},
         "keywords": ["airbus"],
         "summaries": {
             "platform": ["TSX-1", "PAZ-1", "TDX-1"],
@@ -242,7 +244,12 @@ def generate_stac_collection(all_data):
                 "type": "image/tiff; application=geotiff; profile=cloud-optimized",
                 "roles": ["thumbnail"],
                 "title": "Thumbnail Image",
-            }
+            },
+            "visual": {
+                "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+                "roles": ["visual"],
+                "title": "Thumbnail Image",
+            },
         },
     }
     return json.dumps(stac_collection, indent=4)
@@ -271,6 +278,12 @@ def handle_quicklook_url(data, links, assets, mapped_keys):
         assets["thumbnail"] = {
             "href": data["properties"]["quicklookUrl"],
             "type": mime_type,
+        }
+        assets["visual"] = {
+            "href": data["properties"]["quicklookUrl"],
+            "type": mime_type,
+            "roles": ["visual"],
+            "title": "Visual Image",
         }
         mapped_keys.add("quicklookUrl")
 
