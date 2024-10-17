@@ -172,21 +172,19 @@ def test_harvest(mock_create_client, requests_mock, mock_catalogue_response):
     mock_client.create_producer.return_value = mock_producer
 
     bucket_name = "my-bucket"
-    metadata_bucket_name = "metadata_bucket"
 
     s3 = boto3.resource("s3", region_name="us-east-1")
     s3.create_bucket(Bucket=bucket_name)
-    s3.create_bucket(Bucket=metadata_bucket_name)
 
     os.environ["PULSAR_URL"] = "mypulsar.com/pulsar"
 
     runner = CliRunner()
-    runner.invoke(harvest, f"workspace catalogue {bucket_name} {metadata_bucket_name}".split())
+    runner.invoke(harvest, f"workspace catalogue {bucket_name}".split())
 
     s3 = boto3.resource("s3")
     my_bucket = s3.Bucket(bucket_name)
 
-    assert len(list(my_bucket.objects.all())) == 3
+    assert len(list(my_bucket.objects.all())) == 4
 
     args, kwargs = mock_producer.send.call_args
     call_args = json.loads(args[0])

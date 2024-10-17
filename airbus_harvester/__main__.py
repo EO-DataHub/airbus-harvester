@@ -37,8 +37,7 @@ def cli():
     "catalog", type=str
 )  # not currently used but keeping the same structure as the other harvester repos
 @click.argument("s3_bucket", type=str)
-@click.argument("metadata_s3_bucket", type=str)
-def harvest(workspace_name: str, catalog: str, s3_bucket: str, metadata_s3_bucket: str):
+def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     """Harvest a given Airbus catalog, and all records beneath it. Send a pulsar message
     containing all added, updated, and deleted links since the last time the catalog was
     harvested"""
@@ -59,7 +58,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str, metadata_s3_bucke
     key_root = "git-harvester/supported-datasets/airbus"
 
     metadata_s3_key = "harvested-metadata/airbus"
-    previously_harvested = get_metadata(metadata_s3_bucket, metadata_s3_key, s3_client)
+    previously_harvested = get_metadata(s3_bucket, metadata_s3_key, s3_client)
     logging.info(f"Previously harvested URLs: {previously_harvested}")
     latest_harvested = {}
 
@@ -120,7 +119,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str, metadata_s3_bucke
     latest_harvested["summary"] = all_data_summary
 
     # Record harvested hash data in S3
-    upload_file_s3(json.dumps(latest_harvested), metadata_s3_bucket, metadata_s3_key, s3_client)
+    upload_file_s3(json.dumps(latest_harvested), s3_bucket, metadata_s3_key, s3_client)
 
     pulsar_url = os.environ.get("PULSAR_URL")
     pulsar_client = PulsarClient(pulsar_url)
