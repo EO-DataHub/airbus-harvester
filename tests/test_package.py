@@ -194,30 +194,6 @@ def test_harvest(mock_create_client, requests_mock, mock_catalogue_response):
     assert len(call_args["updated_keys"]) == len(call_args["deleted_keys"]) == 0
 
 
-#
-# def test_get_catalogue__success(requests_mock, mock_response):
-#     requests_mock.post(
-#         "https://dev.sar.api.oneatlas.airbus.com/v1/sar/catalogue", text=json.dumps(mock_response)
-#     )
-#     catalogue_data = get_catalogue()
-#
-#     assert catalogue_data == mock_response
-#
-#
-# def test_get_catalogue__fail(requests_mock, mock_response):
-#     requests_mock.post(
-#         "https://dev.sar.api.oneatlas.airbus.com/v1/sar/catalogue",
-#         status_code=404,
-#         text="Not Found",
-#     )
-#
-#     with pytest.raises(requests.exceptions.HTTPError) as error:
-#         get_catalogue()
-#
-#     assert "404" in error.value.args[0]
-#
-
-
 def test__coordinates_to_bbox__success(mock_response):
     coordinates = mock_response["features"][0]["geometry"]["coordinates"]
     expected_bbox = [-28.1373002, 38.5878242, -27.9837603, 38.7135605]
