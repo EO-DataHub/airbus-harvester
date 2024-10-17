@@ -21,6 +21,17 @@ from airbus_harvester.__main__ import (
 )
 
 
+@pytest.fixture(autouse=True)
+def setenvvar(monkeypatch):
+    with mock.patch.dict(os.environ, clear=True):
+        envvars = {
+            "AIRBUS_API_KEY": "41rbu5-4p1-k3y",
+        }
+        for k, v in envvars.items():
+            monkeypatch.setenv(k, v)
+        yield
+
+
 @pytest.fixture
 def mock_catalogue_response():
     return {
