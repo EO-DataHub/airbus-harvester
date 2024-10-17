@@ -8,50 +8,50 @@ attrs==24.2.0
     # via
     #   jsonschema
     #   referencing
-black==24.8.0
+black==24.10.0
     # via Airbus-Harvester (pyproject.toml)
-boto3==1.35.10
+boto3==1.35.42
     # via
     #   Airbus-Harvester (pyproject.toml)
     #   eodhp-utils
     #   moto
-botocore==1.35.10
+botocore==1.35.42
     # via
     #   Airbus-Harvester (pyproject.toml)
     #   boto3
     #   eodhp-utils
     #   moto
     #   s3transfer
-build==1.2.1
+build==1.2.2.post1
     # via pip-tools
 certifi==2024.8.30
     # via
     #   pulsar-client
     #   requests
-cffi==1.17.0
+cffi==1.17.1
     # via cryptography
 cfgv==3.4.0
     # via pre-commit
-charset-normalizer==3.3.2
+charset-normalizer==3.4.0
     # via requests
 click==8.1.7
     # via
     #   Airbus-Harvester (pyproject.toml)
     #   black
     #   pip-tools
-cryptography==43.0.0
+cryptography==43.0.1
     # via moto
-distlib==0.3.8
+distlib==0.3.9
     # via virtualenv
 eodhp-utils @ git+https://github.com/EO-DataHub/eodhp-utils.git@v0.1.1
     # via Airbus-Harvester (pyproject.toml)
 execnet==2.1.1
     # via pytest-xdist
-filelock==3.15.4
+filelock==3.16.1
     # via virtualenv
-identify==2.6.0
+identify==2.6.1
     # via pre-commit
-idna==3.8
+idna==3.10
     # via requests
 inflection==0.5.1
     # via Airbus-Harvester (pyproject.toml)
@@ -69,13 +69,13 @@ jsonschema==4.23.0
     # via
     #   eodhp-utils
     #   pystac
-jsonschema-specifications==2023.12.1
+jsonschema-specifications==2024.10.1
     # via jsonschema
-markupsafe==2.1.5
+markupsafe==3.0.1
     # via
     #   jinja2
     #   werkzeug
-moto==5.0.13
+moto==5.0.17
     # via Airbus-Harvester (pyproject.toml)
 mypy-extensions==1.0.0
     # via black
@@ -90,29 +90,29 @@ pathspec==0.12.1
     # via black
 pip-tools==7.4.1
     # via Airbus-Harvester (pyproject.toml)
-platformdirs==4.2.2
+platformdirs==4.3.6
     # via
     #   black
     #   virtualenv
 pluggy==1.5.0
     # via pytest
-pre-commit==3.8.0
+pre-commit==4.0.1
     # via Airbus-Harvester (pyproject.toml)
 pulsar-client==3.5.0
     # via Airbus-Harvester (pyproject.toml)
 pycparser==2.22
     # via cffi
-pyproject-hooks==1.1.0
+pyproject-hooks==1.2.0
     # via
     #   build
     #   pip-tools
-pystac[validation]==1.10.1
+pystac[validation]==1.11.0
     # via
     #   Airbus-Harvester (pyproject.toml)
     #   pystac-client
-pystac-client==0.8.3
+pystac-client==0.8.4
     # via Airbus-Harvester (pyproject.toml)
-pytest==8.3.2
+pytest==8.3.3
     # via
     #   Airbus-Harvester (pyproject.toml)
     #   pytest-mock
@@ -151,26 +151,26 @@ rpds-py==0.20.0
     # via
     #   jsonschema
     #   referencing
-ruff==0.6.3
+ruff==0.6.9
     # via Airbus-Harvester (pyproject.toml)
-s3transfer==0.10.2
+s3transfer==0.10.3
     # via boto3
 six==1.16.0
     # via python-dateutil
-urllib3==2.2.2
+urllib3==2.2.3
     # via
     #   botocore
     #   requests
     #   responses
-virtualenv==20.26.3
+virtualenv==20.26.6
     # via pre-commit
-watchdog==5.0.0
+watchdog==5.0.3
     # via pytest-watcher
 werkzeug==3.0.4
     # via moto
 wheel==0.44.0
     # via pip-tools
-xmltodict==0.13.0
+xmltodict==0.14.2
     # via moto
 
 # The following packages are considered to be unsafe in a requirements file:

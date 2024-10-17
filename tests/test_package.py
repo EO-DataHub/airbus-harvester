@@ -6,20 +6,71 @@ from unittest.mock import patch
 import boto3
 import moto
 import pytest
-import requests
 from click.testing import CliRunner
 
 from airbus_harvester.__main__ import (
+    add_to_all_data_summary,
     coordinates_to_bbox,
     generate_stac_collection,
     generate_stac_item,
-    get_catalogue,
     get_stac_collection_summary,
     handle_quicklook_url,
     harvest,
     make_catalogue,
     modify_value,
 )
+
+
+@pytest.fixture
+def mock_catalogue_response():
+    return {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [
+                        [
+                            [15.5374877, 60.4735848],
+                            [15.5183265, 60.5203787],
+                            [15.3515055, 60.5030195],
+                            [15.3729703, 60.456454],
+                            [15.5374877, 60.4735848],
+                        ]
+                    ],
+                },
+                "properties": {
+                    "absoluteOrbit": 4670,
+                    "acquisitionId": "TSX-1_HS300_S_spot_037R_4670_A15048840_754",
+                    "antennaMode": "SRA",
+                    "beamId": "spot_037",
+                    "catalogueTime": "2022-02-12T17:51:37.686Z",
+                    "incidenceAngle": {"minimum": 33.46, "maximum": 34.28},
+                    "lookDirection": "R",
+                    "mission": "TSX",
+                    "outOfFullPerformance": False,
+                    "pathDirection": "ascending",
+                    "polarizationChannels": "HH",
+                    "quality": "AUTO_APPROVED",
+                    "relativeOrbit": 161,
+                    "satellite": "TSX-1",
+                    "sensorMode": "SAR_HS_S_300",
+                    "startTime": "2008-04-17T16:28:39.715Z",
+                    "stopTime": "2008-04-17T16:28:40.469Z",
+                    "quicklookUrl": "https://content.sar.api.oneatlas.airbus.com/quicklooks/radar/4326/TSX-1_HS300_S_spot_037R_4670_A15048840_754.tif",
+                },
+                "assets": {
+                    "browse": {
+                        "href": "https://content.sar.api.oneatlas.airbus.com/quicklooks/radar/4326/TSX-1_HS300_S_spot_037R_4670_A15048840_754.tif",
+                        "roles": ["overview"],
+                        "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+                    }
+                },
+            }
+        ],
+        "_links": {"self": "my_link.com"},
+    }
 
 
 @pytest.fixture
@@ -83,11 +134,25 @@ def mock_response():
     }
 
 
+@pytest.fixture
+def mock_data():
+    return {
+        "coordinates": [[-27.9837603, 38.6070725]],
+        "start_time": ["2024-01-22T19:42:44.735Z"],
+        "stop_time": ["2024-01-22T19:42:46.446Z"],
+    }
+
+
 @moto.mock_aws
 @patch("airbus_harvester.__main__.PulsarClient")
-def test_harvest(mock_create_client, requests_mock, mock_response):
+def test_harvest(mock_create_client, requests_mock, mock_catalogue_response):
+    requests_mock.get(
+        "https://sar.api.oneatlas.airbus.com/v1/sar/catalogue/replication",
+        text=json.dumps(mock_catalogue_response),
+    )
     requests_mock.post(
-        "https://dev.sar.api.oneatlas.airbus.com/v1/sar/catalogue", text=json.dumps(mock_response)
+        "https://authenticate.foundation.api.oneatlas.airbus.com/auth/realms/IDP/protocol/openid-connect/token",
+        text='{"access_token": "my_access_token"}',
     )
 
     mock_client = mock.MagicMock()
@@ -96,14 +161,16 @@ def test_harvest(mock_create_client, requests_mock, mock_response):
     mock_client.create_producer.return_value = mock_producer
 
     bucket_name = "my-bucket"
+    metadata_bucket_name = "metadata_bucket"
 
     s3 = boto3.resource("s3", region_name="us-east-1")
     s3.create_bucket(Bucket=bucket_name)
+    s3.create_bucket(Bucket=metadata_bucket_name)
 
     os.environ["PULSAR_URL"] = "mypulsar.com/pulsar"
 
     runner = CliRunner()
-    runner.invoke(harvest, f"workspace catalogue {bucket_name}".split())
+    runner.invoke(harvest, f"workspace catalogue {bucket_name} {metadata_bucket_name}".split())
 
     s3 = boto3.resource("s3")
     my_bucket = s3.Bucket(bucket_name)
@@ -127,26 +194,28 @@ def test_harvest(mock_create_client, requests_mock, mock_response):
     assert len(call_args["updated_keys"]) == len(call_args["deleted_keys"]) == 0
 
 
-def test_get_catalogue__success(requests_mock, mock_response):
-    requests_mock.post(
-        "https://dev.sar.api.oneatlas.airbus.com/v1/sar/catalogue", text=json.dumps(mock_response)
-    )
-    catalogue_data = get_catalogue()
-
-    assert catalogue_data == mock_response
-
-
-def test_get_catalogue__fail(requests_mock, mock_response):
-    requests_mock.post(
-        "https://dev.sar.api.oneatlas.airbus.com/v1/sar/catalogue",
-        status_code=404,
-        text="Not Found",
-    )
-
-    with pytest.raises(requests.exceptions.HTTPError) as error:
-        get_catalogue()
-
-    assert "404" in error.value.args[0]
+#
+# def test_get_catalogue__success(requests_mock, mock_response):
+#     requests_mock.post(
+#         "https://dev.sar.api.oneatlas.airbus.com/v1/sar/catalogue", text=json.dumps(mock_response)
+#     )
+#     catalogue_data = get_catalogue()
+#
+#     assert catalogue_data == mock_response
+#
+#
+# def test_get_catalogue__fail(requests_mock, mock_response):
+#     requests_mock.post(
+#         "https://dev.sar.api.oneatlas.airbus.com/v1/sar/catalogue",
+#         status_code=404,
+#         text="Not Found",
+#     )
+#
+#     with pytest.raises(requests.exceptions.HTTPError) as error:
+#         get_catalogue()
+#
+#     assert "404" in error.value.args[0]
+#
 
 
 def test__coordinates_to_bbox__success(mock_response):
@@ -158,20 +227,26 @@ def test__coordinates_to_bbox__success(mock_response):
     assert expected_bbox == actual_bbox
 
 
-def test_get_stac_collection_summary(mock_response):
+def test_get_stac_collection_summary(mock_data, mock_response):
     expected_summary = {
         "bbox": [-27.9837603, 38.6070725, -27.9837603, 38.6070725],
         "start_time": mock_response["features"][0]["properties"]["startTime"],
         "stop_time": mock_response["features"][0]["properties"]["stopTime"],
     }
 
-    actual_summary = get_stac_collection_summary(mock_response["features"])
+    actual_summary = get_stac_collection_summary(mock_data)
 
     assert actual_summary == expected_summary
 
 
-def test_generate_stac_collection(mock_response):
-    actual_collection = generate_stac_collection(mock_response["features"])
+def test_generate_stac_collection(mock_data):
+    mock_data_summary = {
+        "bbox": [1, 2, 3, 4],
+        "start_time": "2024-01-22T19:42:44.735Z",
+        "stop_time": "2024-01-22T19:42:46.446Z",
+    }
+
+    actual_collection = generate_stac_collection(mock_data_summary)
     json_collection = json.loads(actual_collection)
 
     assert isinstance(actual_collection, str)
@@ -268,3 +343,14 @@ def test_make_catalogue():
     actual_catalogue = make_catalogue()
 
     assert json.loads(actual_catalogue) == expected_catalogue
+
+
+def test_add_to_all_data_summary(mock_response):
+    data = mock_response["features"][0]
+    all_data = {"coordinates": [], "start_time": [], "stop_time": []}
+
+    all_data = add_to_all_data_summary(all_data, data)
+
+    assert all_data["coordinates"][0] == data["geometry"]["coordinates"][0][0]
+    assert all_data["start_time"][0] == data["properties"]["startTime"]
+    assert all_data["stop_time"][0] == data["properties"]["stopTime"]

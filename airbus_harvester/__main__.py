@@ -1,10 +1,13 @@
+import hashlib
 import json
 import logging
 import os
+from json import JSONDecodeError
 
 import boto3
 import click
 import requests
+from botocore.exceptions import ClientError
 from eodhp_utils.aws.s3 import upload_file_s3
 from inflection import underscore
 from pulsar import Client as PulsarClient
@@ -34,7 +37,8 @@ def cli():
     "catalog", type=str
 )  # not currently used but keeping the same structure as the other harvester repos
 @click.argument("s3_bucket", type=str)
-def harvest(workspace_name: str, catalog: str, s3_bucket: str):
+@click.argument("metadata_s3_bucket", type=str)
+def harvest(workspace_name: str, catalog: str, s3_bucket: str, metadata_s3_bucket: str):
     """Harvest a given Airbus catalog, and all records beneath it. Send a pulsar message
     containing all added, updated, and deleted links since the last time the catalog was
     harvested"""
@@ -48,33 +52,119 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     else:
         s3_client = boto3.client("s3")
 
-    added_keys = []
-    updated_keys = []
-    deleted_keys = []
+    all_keys = {"added_keys": [], "updated_keys": []}
+
+    logging.info("Harvesting from Airbus")
 
     key_root = "git-harvester/supported-datasets/airbus"
 
-    all_data = get_catalogue(
-        env=os.getenv("ENVIRONMENT", None), limit=int(os.getenv("NUMBER_OF_ENTRIES", 1))
-    )
+    metadata_s3_key = "harvested-metadata/airbus"
+    previously_harvested = get_metadata(metadata_s3_bucket, metadata_s3_key, s3_client)
+    logging.info(f"Previously harvested URLs: {previously_harvested}")
+    latest_harvested = {}
 
     file_name = "airbus.json"
-    key = f"git-harvester/supported-datasets/{file_name}"
-    upload_file_s3(make_catalogue(), s3_bucket, key, s3_client)
-    added_keys.append(key)
+    catalogue_data = make_catalogue()
+    catalogue_key = f"git-harvester/supported-datasets/{file_name}"
+    previous_hash = previously_harvested.pop(catalogue_key, None)
+    all_keys, latest_harvested[catalogue_key] = compare_to_previous_version(
+        catalogue_key, catalogue_data, previous_hash, all_keys, s3_bucket, s3_client
+    )
+
+    # file_hash = get_file_hash(catalogue_data)
+    # previous_hash = previously_harvested.pop(key, None)
+    #
+    # if not previous_hash:
+    #     # URL was not harvested previously
+    #     logging.info("Appended URL to 'added' list")
+    #     added_keys.append(key)
+    #     upload_file_s3(catalogue_data, s3_bucket, key, s3_client)
+    # elif previous_hash != file_hash:
+    #     # URL has changed since last run
+    #     logging.info("Appended URL to 'updated' list")
+    #     updated_keys.append(key)
+    #     upload_file_s3(catalogue_data, s3_bucket, key, s3_client)
+    #
+    # latest_harvested[key] = file_hash
+
+    all_data_summary = previously_harvested.pop("summary", None)
+
+    if not all_data_summary:
+        all_data_summary = {"start_time": [], "stop_time": [], "coordinates": []}
+
+    next_url = "https://sar.api.oneatlas.airbus.com/v1/sar/catalogue/replication"
+
+    while next_url:
+
+        body = get_next_page(next_url)
+
+        for entry in body["features"]:
+            all_data_summary = add_to_all_data_summary(all_data_summary, entry)
+
+            data = generate_stac_item(entry)
+            file_name = f"{entry['properties']['acquisitionId']}.json"
+            key = f"{key_root}/airbus_sar_data/{file_name}"
+
+            previous_hash = previously_harvested.pop(key, None)
+            all_keys, latest_harvested[key] = compare_to_previous_version(
+                key, data, previous_hash, all_keys, s3_bucket, s3_client
+            )
+            # file_hash = get_file_hash(data)
+            #
+            # if not previous_hash:
+            #     # URL was not harvested previously
+            #     logging.info("Appended URL to 'added' list")
+            #     added_keys.append(key)
+            #     upload_file_s3(data, s3_bucket, key, s3_client)
+            # elif previous_hash != file_hash:
+            #     # URL has changed since last run
+            #     logging.info("Appended URL to 'updated' list")
+            #     updated_keys.append(key)
+            #     upload_file_s3(data, s3_bucket, key, s3_client)
+            #
+            # latest_harvested[key] = file_hash
+
+        all_data_summary = simplify_all_data_summary(all_data_summary)
+
+        try:
+            next_url = body.get("_links").get("next")
+        except AttributeError as e:
+            logging.error(e)
+            raise
+        logging.info(f"Next URL: {next_url}")
+
+    summary = get_stac_collection_summary(all_data_summary)
 
     file_name = "airbus_sar_data.json"
-    key = f"{key_root}/{file_name}"
-    upload_file_s3(generate_stac_collection(all_data["features"]), s3_bucket, key, s3_client)
-    added_keys.append(key)
+    collection_data = generate_stac_collection(summary)
 
-    for raw_data in all_data["features"]:
-        data = generate_stac_item(raw_data)
-        file_name = f"{raw_data['properties']['acquisitionId']}.json"
-        key = f"{key_root}/airbus_sar_data/{file_name}"
-        upload_file_s3(data, s3_bucket, key, s3_client)
+    collection_key = f"{key_root}/{file_name}"
+    previous_hash = previously_harvested.pop(collection_key, None)
 
-        added_keys.append(key)
+    logging.error(all_keys)
+    all_keys, latest_harvested[collection_key] = compare_to_previous_version(
+        collection_key, collection_data, previous_hash, all_keys, s3_bucket, s3_client
+    )
+    logging.error(all_keys)
+    # file_hash = get_file_hash(catalogue_data)
+    #
+    # if not previous_hash:
+    #     # URL was not harvested previously
+    #     logging.info("Appended URL to 'added' list")
+    #     added_keys.append(key)
+    #     upload_file_s3(collection_data, s3_bucket, key, s3_client)
+    # elif previous_hash != file_hash:
+    #     # URL has changed since last run
+    #     logging.info("Appended URL to 'updated' list")
+    #     updated_keys.append(key)
+    #     upload_file_s3(collection_data, s3_bucket, key, s3_client)
+    #
+    # latest_harvested[key] = file_hash
+
+    latest_harvested["summary"] = all_data_summary
+
+    # Record harvested hash data in S3
+    upload_file_s3(json.dumps(latest_harvested), metadata_s3_bucket, metadata_s3_key, s3_client)
 
     pulsar_url = os.environ.get("PULSAR_URL")
     pulsar_client = PulsarClient(pulsar_url)
@@ -82,40 +172,22 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     producer = pulsar_client.create_producer(
         topic="harvested", producer_name="stac_harvester/airbus"
     )
-    logging.info("Harvesting from Airbus")
 
-    # Adapted from other collection code. Keeping this in but commented out for now in case something
-    # similar should be used here
-
-    # for url in url_list:
-    #     logging.info(f"Parsing URL: {url}")
-    #     file_hash = get_file_hash(url)
-    #
-    #     previous_hash = previously_harvested.pop(url, None)
-    #     if not previous_hash:
-    #         # URL was not harvested previously
-    #         logging.info("Appended URL to 'added' list")
-    #         added_keys.append(url)
-    #     elif previous_hash != file_hash:
-    #         # URL has changed since last run
-    #         logging.info("Appended URL to 'updated' list")
-    #         updated_keys.append(url)
-    #     latest_harvested[url] = file_hash
-    #
-    # logging.info(f"Previously harvested URLs not found: {deleted_keys}")
+    deleted_keys = list(previously_harvested.keys())
+    logging.info(f"Previously harvested URLs not found: {deleted_keys}")
 
     output_data = {
         "id": f"{workspace_name}/airbus",
         "workspace": workspace_name,
         "bucket_name": s3_bucket,
-        "added_keys": added_keys,
-        "updated_keys": updated_keys,
+        "added_keys": all_keys["added_keys"],
+        "updated_keys": all_keys["updated_keys"],
         "deleted_keys": deleted_keys,
         "source": "airbus",
         "target": "/",
     }
 
-    if any([added_keys, updated_keys, deleted_keys]):
+    if any([all_keys["added_keys"], all_keys["updated_keys"], deleted_keys]):
         # Send Pulsar message containing harvested links
         producer.send((json.dumps(output_data)).encode("utf-8"))
         logging.info(f"Sent harvested message {output_data}")
@@ -127,30 +199,137 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     return output_data
 
 
-def get_catalogue(env="dev", limit=1):
-    if env == "prod":
-        url = "https://sar.api.oneatlas.airbus.com"
-    else:
-        url = "https://dev.sar.api.oneatlas.airbus.com"
-    # Authorisation not required for get catalogue
-    body = {
-        "limit": limit,
-        # "aoi": {
-        #     "type": "Polygon",
-        #     "coordinates": [
-        #     [[9.346, 47.788], [9.291, 47.644], [9.538, 47.592],
-        #     [9.62, 47.75], [9.511, 47.802], [9.346, 47.788]]
-        #     ]
-        # },
-        # "time": {
-        #     "from": "2020-10-14T13:28:03.569Z",
-        #     "to": "2023-10-29T13:28:03.569Z"
-        # }
+def compare_to_previous_version(key, data, previous_hash, all_keys, s3_bucket, s3_client):
+    file_hash = get_file_hash(data)
+
+    if not previous_hash:
+        # URL was not harvested previously
+        logging.info("Appended key to 'added' list")
+        all_keys["added_keys"].append(key)
+        upload_file_s3(data, s3_bucket, key, s3_client)
+    elif previous_hash != file_hash:
+        # URL has changed since last run
+        logging.info("Appended key to 'updated' list")
+        all_keys["updated_keys"].append(key)
+        upload_file_s3(data, s3_bucket, key, s3_client)
+
+    return all_keys, file_hash
+
+
+def add_to_all_data_summary(all_data, data):
+    all_data["coordinates"].append(data["geometry"]["coordinates"][0][0])
+    all_data["start_time"].append(data["properties"]["startTime"])
+    all_data["stop_time"].append(data["properties"]["stopTime"])
+
+    return all_data
+
+
+def simplify_all_data_summary(all_data: dict) -> dict:
+    biggest_lat = smallest_lat = biggest_long = smallest_long = all_data["coordinates"][0]
+
+    for coordinates in all_data["coordinates"]:
+        if coordinates[0] > biggest_lat[0]:
+            biggest_lat = coordinates
+        elif coordinates[0] < smallest_lat[0]:
+            smallest_lat = coordinates
+        elif coordinates[1] > biggest_long[1]:
+            biggest_long = coordinates
+        elif coordinates[1] < smallest_long[1]:
+            smallest_long = coordinates
+
+    coordinates_summary = [biggest_lat, biggest_long, smallest_lat, smallest_long]
+
+    return {
+        "coordinates": coordinates_summary,
+        "start_time": [min(all_data["start_time"])],
+        "stop_time": [max(all_data["stop_time"])],
     }
-    response = requests.post(f"{url}/v1/sar/catalogue", json=body)
-    response.raise_for_status()
-    body = response.json()
-    return body
+
+
+def generate_access_token(env="dev"):
+    """Generate access token for Airbus API"""
+    if env == "prod":
+        url = "https://authenticate.foundation.api.oneatlas.airbus.com/auth/realms/IDP/protocol/openid-connect/token"
+    else:
+        url = "https://authenticate-int.idp.private.geoapi-airbusds.com/auth/realms/IDP/protocol/openid-connect/token"
+
+    api_key = os.environ["AIRBUS_API_KEY"]
+
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+
+    data = [
+        ("apikey", api_key),
+        ("grant_type", "api_key"),
+        ("client_id", "IDP"),
+    ]
+
+    response = requests.post(url, headers=headers, data=data)
+
+    return response.json().get("access_token")
+
+
+def get_next_page(url, retry_count=0):
+    body = {}
+
+    try:
+        access_token = generate_access_token(env="prod")
+        headers = {"accept": "application/json", "Authorization": "Bearer " + access_token}
+        response = requests.get(url, headers=headers, json=body)
+        response.raise_for_status()
+
+        body = response.json()
+
+        return body
+
+    except JSONDecodeError:
+        logging.warning(f"Retrying retrieval of {url}. Attempt {retry_count}")
+        if retry_count > 3:
+            raise
+
+        return get_next_page(url, retry_count=retry_count + 1)
+
+
+def get_file_hash(data: str) -> str:
+    """Returns hash of data available"""
+
+    def _md5_hash(byte_str: bytes) -> str:
+        """Calculates an md5 hash for given bytestring"""
+        md5 = hashlib.md5()
+        md5.update(byte_str)
+        return md5.hexdigest()
+
+    # if retries == 3:
+    #     # Max number of retries
+    #     return None
+    # try:
+    #     with urlopen(url, timeout=5) as response:
+    #         body = response.read()
+    # except urllib.error.URLError:
+    #     logging.error(f"Unable to access {url}, retrying...")
+    #     return get_file_hash(url, retries + 1)
+    return _md5_hash(data.encode("utf-8"))
+
+
+def get_file_s3(bucket: str, key: str, s3_client: boto3.client) -> str:
+    """Retrieve data from an S3 bucket"""
+    try:
+        file_obj = s3_client.get_object(Bucket=bucket, Key=key)
+        return file_obj["Body"].read().decode("utf-8")
+    except ClientError as e:
+        logging.error(f"File retrieval failed for {key}: {e}")
+        return None
+
+
+def get_metadata(bucket: str, key: str, s3_client: boto3.client) -> dict:
+    """Read file at given S3 location and parse as JSON"""
+    previously_harvested = get_file_s3(bucket, key, s3_client)
+    try:
+        previously_harvested = json.loads(previously_harvested)
+    except TypeError:
+        previously_harvested = {}
+    return previously_harvested
 
 
 def coordinates_to_bbox(coordinates):
@@ -166,18 +345,18 @@ def coordinates_to_bbox(coordinates):
 
 def get_stac_collection_summary(all_data):
     """Gets the area and start/stop times of all data points"""
-    all_coordinates = [x["geometry"]["coordinates"][0][0] for x in all_data]
-    all_start_times = [x["properties"]["startTime"] for x in all_data]
-    all_stop_times = [x["properties"]["stopTime"] for x in all_data]
 
-    bbox = coordinates_to_bbox(all_coordinates)
+    bbox = coordinates_to_bbox(all_data["coordinates"])
 
-    return {"bbox": bbox, "start_time": min(all_start_times), "stop_time": max(all_stop_times)}
+    return {
+        "bbox": bbox,
+        "start_time": min(all_data["start_time"]),
+        "stop_time": max(all_data["stop_time"]),
+    }
 
 
-def generate_stac_collection(all_data):
+def generate_stac_collection(all_data_summary: dict):
     """Top level collection for Airbus data"""
-    summary = get_stac_collection_summary(all_data)
 
     stac_collection = {
         "type": "Collection",
@@ -199,8 +378,10 @@ def generate_stac_collection(all_data):
         "title": "Airbus SAR Data",
         "geometry": {"type": "Polygon"},
         "extent": {
-            "spatial": {"bbox": [summary["bbox"]]},
-            "temporal": {"interval": [[summary["start_time"], summary["stop_time"]]]},
+            "spatial": {"bbox": [all_data_summary["bbox"]]},
+            "temporal": {
+                "interval": [[all_data_summary["start_time"], all_data_summary["stop_time"]]]
+            },
         },
         "license": "proprietary",
         "keywords": ["airbus"],
