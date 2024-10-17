@@ -71,22 +71,6 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str, metadata_s3_bucke
         catalogue_key, catalogue_data, previous_hash, all_keys, s3_bucket, s3_client
     )
 
-    # file_hash = get_file_hash(catalogue_data)
-    # previous_hash = previously_harvested.pop(key, None)
-    #
-    # if not previous_hash:
-    #     # URL was not harvested previously
-    #     logging.info("Appended URL to 'added' list")
-    #     added_keys.append(key)
-    #     upload_file_s3(catalogue_data, s3_bucket, key, s3_client)
-    # elif previous_hash != file_hash:
-    #     # URL has changed since last run
-    #     logging.info("Appended URL to 'updated' list")
-    #     updated_keys.append(key)
-    #     upload_file_s3(catalogue_data, s3_bucket, key, s3_client)
-    #
-    # latest_harvested[key] = file_hash
-
     all_data_summary = previously_harvested.pop("summary", None)
 
     if not all_data_summary:
@@ -109,20 +93,6 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str, metadata_s3_bucke
             all_keys, latest_harvested[key] = compare_to_previous_version(
                 key, data, previous_hash, all_keys, s3_bucket, s3_client
             )
-            # file_hash = get_file_hash(data)
-            #
-            # if not previous_hash:
-            #     # URL was not harvested previously
-            #     logging.info("Appended URL to 'added' list")
-            #     added_keys.append(key)
-            #     upload_file_s3(data, s3_bucket, key, s3_client)
-            # elif previous_hash != file_hash:
-            #     # URL has changed since last run
-            #     logging.info("Appended URL to 'updated' list")
-            #     updated_keys.append(key)
-            #     upload_file_s3(data, s3_bucket, key, s3_client)
-            #
-            # latest_harvested[key] = file_hash
 
         all_data_summary = simplify_all_data_summary(all_data_summary)
 
@@ -146,20 +116,6 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str, metadata_s3_bucke
         collection_key, collection_data, previous_hash, all_keys, s3_bucket, s3_client
     )
     logging.error(all_keys)
-    # file_hash = get_file_hash(catalogue_data)
-    #
-    # if not previous_hash:
-    #     # URL was not harvested previously
-    #     logging.info("Appended URL to 'added' list")
-    #     added_keys.append(key)
-    #     upload_file_s3(collection_data, s3_bucket, key, s3_client)
-    # elif previous_hash != file_hash:
-    #     # URL has changed since last run
-    #     logging.info("Appended URL to 'updated' list")
-    #     updated_keys.append(key)
-    #     upload_file_s3(collection_data, s3_bucket, key, s3_client)
-    #
-    # latest_harvested[key] = file_hash
 
     latest_harvested["summary"] = all_data_summary
 
@@ -300,15 +256,6 @@ def get_file_hash(data: str) -> str:
         md5.update(byte_str)
         return md5.hexdigest()
 
-    # if retries == 3:
-    #     # Max number of retries
-    #     return None
-    # try:
-    #     with urlopen(url, timeout=5) as response:
-    #         body = response.read()
-    # except urllib.error.URLError:
-    #     logging.error(f"Unable to access {url}, retrying...")
-    #     return get_file_hash(url, retries + 1)
     return _md5_hash(data.encode("utf-8"))
 
 
