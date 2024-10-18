@@ -76,8 +76,10 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         all_data_summary = {"start_time": [], "stop_time": [], "coordinates": []}
 
     next_url = "https://sar.api.oneatlas.airbus.com/v1/sar/catalogue/replication"
+    url_count = 0
 
     while next_url:
+        url_count += 1
 
         body = get_next_page(next_url)
 
@@ -100,7 +102,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         except AttributeError as e:
             logging.error(e)
             raise
-        logging.info(f"Next URL: {next_url}")
+        logging.info(f"Page {url_count} next URL: {next_url}")
 
     summary = get_stac_collection_summary(all_data_summary)
 
@@ -159,12 +161,12 @@ def compare_to_previous_version(key, data, previous_hash, all_keys, s3_bucket, s
 
     if not previous_hash:
         # URL was not harvested previously
-        logging.info("Appended key to 'added' list")
+        logging.info(f"Added: {key}")
         all_keys["added_keys"].append(key)
         upload_file_s3(data, s3_bucket, key, s3_client)
     elif previous_hash != file_hash:
         # URL has changed since last run
-        logging.info("Appended key to 'updated' list")
+        logging.info(f"Updated: {key}")
         all_keys["updated_keys"].append(key)
         upload_file_s3(data, s3_bucket, key, s3_client)
 
