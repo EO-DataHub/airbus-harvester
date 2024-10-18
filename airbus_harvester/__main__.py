@@ -125,7 +125,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     pulsar_client = PulsarClient(pulsar_url)
 
     producer = pulsar_client.create_producer(
-        topic="harvested", producer_name="stac_harvester/airbus"
+        topic="harvested", producer_name="stac_harvester/airbus", chunking_enabled=True
     )
 
     deleted_keys = list(previously_harvested.keys())
