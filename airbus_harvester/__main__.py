@@ -238,7 +238,7 @@ def get_next_page(url, retry_count=0):
 
         return body
 
-    except JSONDecodeError:
+    except (JSONDecodeError, requests.exceptions.HTTPError):
         logging.warning(f"Retrying retrieval of {url}. Attempt {retry_count}")
         if retry_count > 3:
             raise
