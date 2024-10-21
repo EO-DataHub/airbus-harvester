@@ -167,6 +167,9 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     # Remove this otherwise it will be marked for deletion
     previously_harvested.pop(collection_key, None)
 
+    if latest_harvested[collection_key] == previously_harvested[collection_key]:
+        all_keys["updated_keys"].discard(collection_key)
+
     deleted_keys = list(previously_harvested.keys())
     output_data = {
         "id": f"{workspace_name}/airbus",
