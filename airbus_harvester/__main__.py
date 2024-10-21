@@ -119,7 +119,8 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         # Collection updates every loop so that start/stop times and bbox values are the latest
         # ones from the Airbus catalogue
         collection_data = generate_stac_collection(summary)
-        previous_hash = latest_harvested.get(collection_key)
+        last_run_hash = latest_harvested.get(collection_key)
+        previous_hash = last_run_hash if last_run_hash else previously_harvested.get(collection_key)
 
         all_keys, latest_harvested[collection_key] = compare_to_previous_version(
             collection_key, collection_data, previous_hash, all_keys, s3_bucket, s3_client
