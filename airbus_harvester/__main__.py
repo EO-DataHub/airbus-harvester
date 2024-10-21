@@ -51,6 +51,9 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     else:
         s3_client = boto3.client("s3")
 
+    pulsar_url = os.environ.get("PULSAR_URL")
+    pulsar_client = PulsarClient(pulsar_url)
+
     all_keys = {"added_keys": [], "updated_keys": []}
 
     logging.info("Harvesting from Airbus")
@@ -70,6 +73,9 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         catalogue_key, catalogue_data, previous_hash, all_keys, s3_bucket, s3_client
     )
 
+    collection_file_name = "airbus_sar_data.json"
+    collection_key = f"{key_root}/{collection_file_name}"
+
     all_data_summary = previously_harvested.pop("summary", None)
 
     if not all_data_summary:
@@ -77,6 +83,8 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
     next_url = "https://sar.api.oneatlas.airbus.com/v1/sar/catalogue/replication"
     url_count = 0
+
+    deleted_keys = []
 
     while next_url:
         url_count += 1
@@ -104,35 +112,55 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
             raise
         logging.info(f"Page {url_count} next URL: {next_url}")
 
-    summary = get_stac_collection_summary(all_data_summary)
+        summary = get_stac_collection_summary(all_data_summary)
 
-    file_name = "airbus_sar_data.json"
-    collection_data = generate_stac_collection(summary)
+        # Collection updates every loop so that start/stop times and bbox values are the latest
+        # ones from the Airbus catalogue
+        collection_data = generate_stac_collection(summary)
+        previous_hash = previously_harvested.get(collection_key)
 
-    collection_key = f"{key_root}/{file_name}"
-    previous_hash = previously_harvested.pop(collection_key, None)
+        all_keys, latest_harvested[collection_key] = compare_to_previous_version(
+            collection_key, collection_data, previous_hash, all_keys, s3_bucket, s3_client
+        )
 
-    logging.error(all_keys)
-    all_keys, latest_harvested[collection_key] = compare_to_previous_version(
-        collection_key, collection_data, previous_hash, all_keys, s3_bucket, s3_client
-    )
-    logging.error(all_keys)
+        latest_harvested["summary"] = all_data_summary
 
-    latest_harvested["summary"] = all_data_summary
+        # Record harvested hash data in S3
+        upload_file_s3(json.dumps(latest_harvested), s3_bucket, metadata_s3_key, s3_client)
 
-    # Record harvested hash data in S3
-    upload_file_s3(json.dumps(latest_harvested), s3_bucket, metadata_s3_key, s3_client)
+        producer = pulsar_client.create_producer(
+            topic="harvested", producer_name="stac_harvester/airbus", chunking_enabled=True
+        )
 
-    pulsar_url = os.environ.get("PULSAR_URL")
-    pulsar_client = PulsarClient(pulsar_url)
+        logging.info(f"Previously harvested URLs not found: {deleted_keys}")
 
-    producer = pulsar_client.create_producer(
-        topic="harvested", producer_name="stac_harvester/airbus", chunking_enabled=True
-    )
+        output_data = {
+            "id": f"{workspace_name}/airbus",
+            "workspace": workspace_name,
+            "bucket_name": s3_bucket,
+            "added_keys": all_keys["added_keys"],
+            "updated_keys": all_keys["updated_keys"],
+            "deleted_keys": deleted_keys,
+            "source": "airbus",
+            "target": "/",
+        }
+
+        if any([all_keys["added_keys"], all_keys["updated_keys"], deleted_keys]):
+            # Send Pulsar message containing harvested links
+            producer.send((json.dumps(output_data)).encode("utf-8"))
+            logging.info(f"Sent harvested message {output_data}")
+        else:
+            logging.info("No changes made to previously harvested state")
+
+        logging.info(output_data)
+
+        producer.close()
+        all_keys = {"added_keys": [], "updated_keys": []}
+
+    # Remove this otherwise it will be marked for deletion
+    previously_harvested.pop(collection_key, None)
 
     deleted_keys = list(previously_harvested.keys())
-    logging.info(f"Previously harvested URLs not found: {deleted_keys}")
-
     output_data = {
         "id": f"{workspace_name}/airbus",
         "workspace": workspace_name,
@@ -143,15 +171,12 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         "source": "airbus",
         "target": "/",
     }
-
     if any([all_keys["added_keys"], all_keys["updated_keys"], deleted_keys]):
         # Send Pulsar message containing harvested links
         producer.send((json.dumps(output_data)).encode("utf-8"))
         logging.info(f"Sent harvested message {output_data}")
     else:
         logging.info("No changes made to previously harvested state")
-
-    logging.info(output_data)
 
     return output_data
 
