@@ -19,6 +19,8 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()],
 )
 
+minimum_message_entries = int(os.environ.get("MINIMUM_MESSAGE_ENTRIES", 100))
+
 
 @click.group()
 # you can implement any global flags here that will apply to all commands, e.g. debug
@@ -54,7 +56,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     pulsar_url = os.environ.get("PULSAR_URL")
     pulsar_client = PulsarClient(pulsar_url)
 
-    all_keys = {"added_keys": [], "updated_keys": []}
+    all_keys = {"added_keys": set(), "updated_keys": set()}
 
     logging.info("Harvesting from Airbus")
 
@@ -117,7 +119,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         # Collection updates every loop so that start/stop times and bbox values are the latest
         # ones from the Airbus catalogue
         collection_data = generate_stac_collection(summary)
-        previous_hash = previously_harvested.get(collection_key)
+        previous_hash = latest_harvested[collection_key]
 
         all_keys, latest_harvested[collection_key] = compare_to_previous_version(
             collection_key, collection_data, previous_hash, all_keys, s3_bucket, s3_client
@@ -125,37 +127,42 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
         latest_harvested["summary"] = all_data_summary
 
-        # Record harvested hash data in S3
-        upload_file_s3(json.dumps(latest_harvested), s3_bucket, metadata_s3_key, s3_client)
+        # Don't send empty or nearly empty pulsar messages
+        if (
+            len(all_keys["added_keys"]) + len(all_keys["updated_keys"]) + len(deleted_keys)
+            > minimum_message_entries
+        ):
+            # Record harvested hash data in S3
+            upload_file_s3(json.dumps(latest_harvested), s3_bucket, metadata_s3_key, s3_client)
 
-        producer = pulsar_client.create_producer(
-            topic="harvested", producer_name="stac_harvester/airbus", chunking_enabled=True
-        )
+            producer = pulsar_client.create_producer(
+                topic="harvested", producer_name="stac_harvester/airbus", chunking_enabled=True
+            )
 
-        logging.info(f"Previously harvested URLs not found: {deleted_keys}")
+            logging.info(f"Previously harvested URLs not found: {deleted_keys}")
 
-        output_data = {
-            "id": f"{workspace_name}/airbus",
-            "workspace": workspace_name,
-            "bucket_name": s3_bucket,
-            "added_keys": all_keys["added_keys"],
-            "updated_keys": all_keys["updated_keys"],
-            "deleted_keys": deleted_keys,
-            "source": "airbus",
-            "target": "/",
-        }
+            output_data = {
+                "id": f"{workspace_name}/airbus",
+                "workspace": workspace_name,
+                "bucket_name": s3_bucket,
+                "added_keys": all_keys["added_keys"],
+                "updated_keys": all_keys["updated_keys"],
+                "deleted_keys": deleted_keys,
+                "source": "airbus",
+                "target": "/",
+            }
 
-        if any([all_keys["added_keys"], all_keys["updated_keys"], deleted_keys]):
-            # Send Pulsar message containing harvested links
-            producer.send((json.dumps(output_data)).encode("utf-8"))
-            logging.info(f"Sent harvested message {output_data}")
-        else:
-            logging.info("No changes made to previously harvested state")
+            if any([all_keys["added_keys"], all_keys["updated_keys"], deleted_keys]):
+                # Send Pulsar message containing harvested links
+                producer.send((json.dumps(output_data)).encode("utf-8"))
+                logging.info(f"Sent harvested message {output_data}")
+            else:
+                logging.info("No changes made to previously harvested state")
 
-        logging.info(output_data)
+            logging.info(output_data)
 
-        producer.close()
-        all_keys = {"added_keys": [], "updated_keys": []}
+            producer.close()
+            all_keys = {"added_keys": set(), "updated_keys": set()}
 
     # Remove this otherwise it will be marked for deletion
     previously_harvested.pop(collection_key, None)
@@ -181,18 +188,20 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     return output_data
 
 
-def compare_to_previous_version(key, data, previous_hash, all_keys, s3_bucket, s3_client):
+def compare_to_previous_version(
+    key: str, data: str, previous_hash: str, all_keys: dict, s3_bucket: str, s3_client
+):
     file_hash = get_file_hash(data)
 
     if not previous_hash:
         # URL was not harvested previously
         logging.info(f"Added: {key}")
-        all_keys["added_keys"].append(key)
+        all_keys["added_keys"].add(key)
         upload_file_s3(data, s3_bucket, key, s3_client)
     elif previous_hash != file_hash:
         # URL has changed since last run
         logging.info(f"Updated: {key}")
-        all_keys["updated_keys"].append(key)
+        all_keys["updated_keys"].add(key)
         upload_file_s3(data, s3_bucket, key, s3_client)
 
     return all_keys, file_hash
