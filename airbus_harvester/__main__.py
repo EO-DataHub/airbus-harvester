@@ -278,9 +278,7 @@ def get_next_page(url, retry_count=0):
 
     try:
         access_token = generate_access_token(env="prod")
-        print(access_token)
 
-        input()
         headers = {"accept": "application/json", "Authorization": "Bearer " + access_token}
         response = requests.get(url, headers=headers, json=body)
         response.raise_for_status()
