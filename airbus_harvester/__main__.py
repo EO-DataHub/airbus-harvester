@@ -172,7 +172,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
     deleted_keys = list(previously_harvested.keys())
     output_data = {
-        "id": f"{workspace_name}/airbus",
+        "id": f"{workspace_name}/airbus_final",
         "workspace": workspace_name,
         "bucket_name": s3_bucket,
         "added_keys": list(all_keys["added_keys"]),
