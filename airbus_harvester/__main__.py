@@ -139,7 +139,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
             logging.info(f"Previously harvested URLs not found: {deleted_keys}")
 
             output_data = {
-                "id": f"{workspace_name}/airbus",
+                "id": f"{workspace_name}/airbus_{url_count}",
                 "workspace": workspace_name,
                 "bucket_name": s3_bucket,
                 "added_keys": list(all_keys["added_keys"]),
@@ -278,6 +278,9 @@ def get_next_page(url, retry_count=0):
 
     try:
         access_token = generate_access_token(env="prod")
+        print(access_token)
+
+        input()
         headers = {"accept": "application/json", "Authorization": "Bearer " + access_token}
         response = requests.get(url, headers=headers, json=body)
         response.raise_for_status()
