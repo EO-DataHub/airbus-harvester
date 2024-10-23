@@ -201,7 +201,7 @@ def compare_to_previous_version(
     harvested_keys: dict,
     s3_bucket: str,
     s3_client: boto3.session.Session.client,
-) -> tuple(str, str):
+) -> tuple:
     """Compares a file to a previous version of a file as determined by the hash. New or updated
     files are uploaded to S3"""
     file_hash = get_file_hash(data)
