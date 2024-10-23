@@ -9,7 +9,7 @@ import pytest
 from click.testing import CliRunner
 
 from airbus_harvester.__main__ import (
-    add_to_all_data_summary,
+    add_to_catalogue_data_summary,
     coordinates_to_bbox,
     generate_stac_collection,
     generate_stac_item,
@@ -334,7 +334,7 @@ def test_add_to_all_data_summary(mock_response):
     data = mock_response["features"][0]
     all_data = {"coordinates": [], "start_time": [], "stop_time": []}
 
-    all_data = add_to_all_data_summary(all_data, data)
+    all_data = add_to_catalogue_data_summary(all_data, data)
 
     assert all_data["coordinates"][0] == data["geometry"]["coordinates"][0][0]
     assert all_data["start_time"][0] == data["properties"]["startTime"]
