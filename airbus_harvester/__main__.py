@@ -183,22 +183,27 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     return output_data
 
 
-def create_producer(pulsar_client):
-    return pulsar_client.create_producer(
+def send_pulsar_message(output_data: dict, pulsar_client: PulsarClient) -> None:
+    """Sends pulsar message for a given set of output data"""
+
+    producer = pulsar_client.create_producer(
         topic="harvested", producer_name="stac_harvester/airbus", chunking_enabled=True
     )
-
-
-def send_pulsar_message(output_data: dict, pulsar_client):
-    producer = create_producer(pulsar_client)
     producer.send((json.dumps(output_data)).encode("utf-8"))
     producer.close()
     logging.info(f"Sent harvested message {output_data}")
 
 
 def compare_to_previous_version(
-    key: str, data: str, previous_hash: str, harvested_keys: dict, s3_bucket: str, s3_client
-):
+    key: str,
+    data: str,
+    previous_hash: str,
+    harvested_keys: dict,
+    s3_bucket: str,
+    s3_client: boto3.session.Session.client,
+) -> tuple(str, str):
+    """Compares a file to a previous version of a file as determined by the hash. New or updated
+    files are uploaded to S3"""
     file_hash = get_file_hash(data)
 
     if not previous_hash:
@@ -215,7 +220,8 @@ def compare_to_previous_version(
     return harvested_keys, file_hash
 
 
-def add_to_catalogue_data_summary(all_data, data):
+def add_to_catalogue_data_summary(all_data, data) -> dict:
+    """Combines new data with existing data for whole catalogue"""
     all_data["coordinates"].append(data["geometry"]["coordinates"][0][0])
     all_data["start_time"].append(data["properties"]["startTime"])
     all_data["stop_time"].append(data["properties"]["stopTime"])
@@ -224,6 +230,7 @@ def add_to_catalogue_data_summary(all_data, data):
 
 
 def simplify_catalogue_data_summary(all_data: dict) -> dict:
+    """Finds the bbox, start and stop time of all data so far and removes any superfluous values"""
     biggest_lat = smallest_lat = biggest_long = smallest_long = all_data["coordinates"][0]
 
     for coordinates in all_data["coordinates"]:
@@ -245,7 +252,7 @@ def simplify_catalogue_data_summary(all_data: dict) -> dict:
     }
 
 
-def generate_access_token(env="dev"):
+def generate_access_token(env: str = "dev") -> str:
     """Generate access token for Airbus API"""
     if env == "prod":
         url = "https://authenticate.foundation.api.oneatlas.airbus.com/auth/realms/IDP/protocol/openid-connect/token"
@@ -269,7 +276,8 @@ def generate_access_token(env="dev"):
     return response.json().get("access_token")
 
 
-def get_next_page(url, retry_count=0):
+def get_next_page(url: str, retry_count: int = 0) -> dict:
+    """Collects body of next page of Airbus data"""
     body = {}
 
     try:
@@ -323,7 +331,7 @@ def get_metadata(bucket: str, key: str, s3_client: boto3.client) -> dict:
     return previously_harvested
 
 
-def coordinates_to_bbox(coordinates):
+def coordinates_to_bbox(coordinates: dict) -> list:
     """Finds the biggest and smallest x and y coordinates"""
 
     unzipped = list(zip(*coordinates, strict=False))
@@ -334,7 +342,7 @@ def coordinates_to_bbox(coordinates):
     return min_values + max_values
 
 
-def get_stac_collection_summary(all_data):
+def get_stac_collection_summary(all_data: dict) -> dict:
     """Gets the area and start/stop times of all data points"""
 
     bbox = coordinates_to_bbox(all_data["coordinates"])
@@ -346,7 +354,7 @@ def get_stac_collection_summary(all_data):
     }
 
 
-def generate_stac_collection(all_data_summary: dict):
+def generate_stac_collection(all_data_summary: dict) -> str:
     """Top level collection for Airbus data"""
 
     stac_collection = {
@@ -447,7 +455,7 @@ def handle_quicklook_url(data, links, assets, mapped_keys):
         mapped_keys.add("quicklookUrl")
 
 
-def modify_value(key, value):
+def modify_value(key, value) -> str:
     """Modify a specific value to STAC format depending on the key"""
     if key == "lookDirection":
         # Convert look direction to human readable format
@@ -458,7 +466,7 @@ def modify_value(key, value):
     return value
 
 
-def generate_stac_item(data):
+def generate_stac_item(data) -> str:
     """Catalogue items for Airbus data"""
     coordinates = data["geometry"]["coordinates"][0]
     bbox = coordinates_to_bbox(coordinates)
@@ -512,7 +520,7 @@ def generate_stac_item(data):
     return json.dumps(stac_item, indent=4)
 
 
-def make_catalogue():
+def make_catalogue() -> str:
     """Top level catalogue for Airbus data"""
     stac_catalog = {
         "type": "Catalog",
