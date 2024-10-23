@@ -149,13 +149,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                 "target": "/",
             }
 
-            if any([harvested_keys["added_keys"], harvested_keys["updated_keys"], deleted_keys]):
-                # Send Pulsar message containing harvested links
-                send_pulsar_message(output_data, pulsar_client)
-            else:
-                logging.info("No changes made to previously harvested state")
-
-            logging.info(output_data)
+            send_pulsar_message(output_data, pulsar_client)
 
             harvested_keys = {"added_keys": set(), "updated_keys": set()}
 
