@@ -10,12 +10,12 @@ attrs==24.2.0
     #   referencing
 black==24.10.0
     # via Airbus-Harvester (pyproject.toml)
-boto3==1.35.42
+boto3==1.35.53
     # via
     #   Airbus-Harvester (pyproject.toml)
     #   eodhp-utils
     #   moto
-botocore==1.35.42
+botocore==1.35.53
     # via
     #   Airbus-Harvester (pyproject.toml)
     #   boto3
@@ -39,7 +39,7 @@ click==8.1.7
     #   Airbus-Harvester (pyproject.toml)
     #   black
     #   pip-tools
-cryptography==43.0.1
+cryptography==43.0.3
     # via moto
 distlib==0.3.9
     # via virtualenv
@@ -71,11 +71,11 @@ jsonschema==4.23.0
     #   pystac
 jsonschema-specifications==2024.10.1
     # via jsonschema
-markupsafe==3.0.1
+markupsafe==3.0.2
     # via
     #   jinja2
     #   werkzeug
-moto==5.0.17
+moto==5.0.18
     # via Airbus-Harvester (pyproject.toml)
 mypy-extensions==1.0.0
     # via black
@@ -110,7 +110,7 @@ pystac[validation]==1.11.0
     # via
     #   Airbus-Harvester (pyproject.toml)
     #   pystac-client
-pystac-client==0.8.4
+pystac-client==0.8.5
     # via Airbus-Harvester (pyproject.toml)
 pytest==8.3.3
     # via
@@ -147,11 +147,11 @@ requests-mock==1.12.1
     # via Airbus-Harvester (pyproject.toml)
 responses==0.25.3
     # via moto
-rpds-py==0.20.0
+rpds-py==0.20.1
     # via
     #   jsonschema
     #   referencing
-ruff==0.6.9
+ruff==0.7.1
     # via Airbus-Harvester (pyproject.toml)
 s3transfer==0.10.3
     # via boto3
@@ -162,11 +162,11 @@ urllib3==2.2.3
     #   botocore
     #   requests
     #   responses
-virtualenv==20.26.6
+virtualenv==20.27.1
     # via pre-commit
 watchdog==5.0.3
     # via pytest-watcher
-werkzeug==3.0.4
+werkzeug==3.1.0
     # via moto
 wheel==0.44.0
     # via pip-tools
