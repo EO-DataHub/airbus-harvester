@@ -278,18 +278,15 @@ def generate_access_token(env: str = "dev") -> str:
 
 def get_next_page(url: str, retry_count: int = 0) -> dict:
     """Collects body of next page of Airbus data"""
-    body = {}
 
     try:
         access_token = generate_access_token(env="prod")
 
         headers = {"accept": "application/json", "Authorization": "Bearer " + access_token}
-        response = requests.get(url, headers=headers, json=body)
+        response = requests.get(url, headers=headers)
         response.raise_for_status()
 
-        body = response.json()
-
-        return body
+        return response.json()
 
     except (JSONDecodeError, requests.exceptions.HTTPError):
         logging.warning(f"Retrying retrieval of {url}. Attempt {retry_count}")
