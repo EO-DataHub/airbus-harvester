@@ -126,9 +126,15 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                 logging.error(e)
                 raise
         elif config["pagination_method"] == "counter":
-            config["body"]["startPage"] = url_count + 1
             if not body["features"]:
                 next_url = None
+            else:
+                # The counter can only go up to 50. Limit the search by last update date
+                if (url_count + 1) % 50 == 0:
+                    config["body"][
+                        "lastUpdateDate"
+                    ] = f"[2018-10-03T12:00:00Z,{entry['properties']['lastUpdateDate']}]"
+                config["body"]["startPage"] = (url_count % 50) + 1
 
         logging.info(f"Page {url_count} next URL: {next_url}")
 
