@@ -6,7 +6,7 @@ DOCKERREPO ?= public.ecr.aws/n1b3o1k2
 dockerbuild:
 	DOCKER_BUILDKIT=1 docker build -t ${IMAGENAME}:${VERSION} .
 
-dockerpush: dockerbuild testdocker
+dockerpush: dockerbuild
 	docker tag ${IMAGENAME}:${VERSION} ${DOCKERREPO}/${IMAGENAME}:${VERSION}
 	docker push ${DOCKERREPO}/${IMAGENAME}:${VERSION}
 

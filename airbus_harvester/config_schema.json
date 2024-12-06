@@ -1,0 +1,73 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Harvester Configuration",
+    "type": "object",
+    "properties": {
+        "collection_name": {
+            "type": "string",
+            "description": "Name of the STAC collection."
+        },
+        "url": {
+            "type": "string",
+            "description": "API endpoint for the data."
+        },
+        "auth_env": {
+            "type": ["string", "null"],
+            "description": "Airbus environment used for authentication if required.",
+            "enum": ["prod", "dev"]
+        },
+        "body": {
+            "type": [
+                "object",
+                "null"
+            ],
+            "description": "Request body for the API call, if applicable."
+        },
+        "request_method": {
+            "type": "string",
+            "description": "HTTP method for the API request.",
+            "enum": ["GET", "POST"]
+        },
+        "stac_properties": {
+            "type": "object",
+            "description": "STAC properties common across all STAC items."
+        },
+        "stac_properties_map": {
+            "type": "object",
+            "description": "Mapping of STAC properties to API response fields."
+        },
+        "external_urls": {
+            "type": "array",
+            "description": "External URLs to be added as links and assets.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the external URL in STAC."
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "Path to the external URL in the API response."
+                    }
+                }
+            }
+        },
+        "stac_extensions": {
+            "type": "array",
+            "description": "List of STAC extensions used.",
+            "items": {
+                "type": "string"
+            }
+        },
+        "item_id_key": {
+            "type": "string",
+            "description": "Key within the API response to be used as the STAC item ID."
+        },
+        "pagination_method": {
+            "type": "string",
+            "description": "Method used for pagination in the API.",
+            "enum": ["link", "counter"]
+        }
+    }
+}

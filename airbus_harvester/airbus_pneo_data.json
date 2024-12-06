@@ -1,0 +1,42 @@
+{
+    "type": "Collection",
+    "id": "airbus_pneo_data",
+    "stac_version": "1.0.0",
+    "stac_extensions": [],
+    "description": "Experience the forefront of Earth observation innovation with Pléiades Neo - Airbus's leading optical constellation featuring two identical 30cm resolution satellites renowned for their ultimate reactivity. Since its launch in 2021, this innovative constellation has revolutionised the landscape of Earth observation-based services, setting new standards of precision and reliability. Funded, manufactured, owned, and operated entirely by Airbus, Pléiades Neo reflects their unfailing commitment to excellence. Through meticulous optimisation of every stage of the imagery acquisition and delivery cycle, Airbus guarantees the provision of top-level Earth observation services.",
+    "links": [],
+    "title": "Airbus PNEO Data",
+    "geometry": {
+        "type": "Polygon"
+    },
+    "extent": {
+        "spatial": {
+            "bbox": []
+        },
+        "temporal": {
+            "interval": []
+        }
+    },
+    "license": "proprietary",
+    "keywords": [
+        "airbus"
+    ],
+    "summaries": {
+        "platform": [
+            "PNEO3",
+            "PNEO4"
+        ],
+        "constellation": [
+            "PNEO"
+        ]
+    },
+    "item_assets": {
+        "thumbnail": {
+            "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+            "roles": [
+                "thumbnail"
+            ],
+            "title": "Thumbnail Image"
+        }
+    }
+}
