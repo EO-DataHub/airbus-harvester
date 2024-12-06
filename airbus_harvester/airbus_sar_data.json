@@ -1,0 +1,108 @@
+{
+    "type": "Collection",
+    "id": "airbus_sar_data",
+    "stac_version": "1.0.0",
+    "stac_extensions": [
+        "https://stac-extensions.github.io/sar/v1.0.0/schema.json",
+        "https://stac-extensions.github.io/sat/v1.0.0/schema.json"
+    ],
+    "description": "The German TerraSAR-X / TanDEM-X satellite formation and the Spanish PAZ satellite (managed by Hisdesat Servicios Estratégicos S.A.) are being operated in the same orbit tube and feature identical ground swaths and imaging modes - allowing Airbus and Hisdesat to establish a unique commercial Radar Constellation. The satellites carry a high frequency X-band Synthetic Aperture Radar (SAR) sensor in order to acquire datasets ranging from very high-resolution imagery to wide area coverage.",
+    "links": [],
+    "title": "Airbus SAR Data",
+    "geometry": {
+        "type": "Polygon"
+    },
+    "extent": {
+        "spatial": {
+            "bbox": []
+        },
+        "temporal": {
+            "interval": []
+        }
+    },
+    "license": "proprietary",
+    "keywords": [
+        "airbus"
+    ],
+    "summaries": {
+        "platform": [
+            "TSX-1",
+            "PAZ-1",
+            "TDX-1"
+        ],
+        "constellation": [
+            "TSX",
+            "PAZ"
+        ],
+        "sar:product_type": [
+            "SSC",
+            "MGD",
+            "GEC",
+            "EEC"
+        ],
+        "sat:orbit_state": [
+            "ascending",
+            "descending"
+        ],
+        "sar:polarizations": [
+            [
+                "VV",
+                "VH"
+            ],
+            [
+                "HH",
+                "HV"
+            ],
+            [
+                "HH",
+                "VV"
+            ],
+            [
+                "VV"
+            ],
+            [
+                "VH"
+            ],
+            [
+                "HH"
+            ],
+            [
+                "HV"
+            ]
+        ],
+        "sar:frequency_band": [
+            "X"
+        ],
+        "sar:instrument_mode": [
+            "SAR_ST_S",
+            "SAR_HS_S",
+            "SAR_HS_S_300",
+            "SAR_HS_S_150",
+            "SAR_HS_D",
+            "SAR_HS_D_300",
+            "SAR_HS_D_150",
+            "SAR_SL_S",
+            "SAR_SL_D",
+            "SAR_SM_S",
+            "SAR_SM_D",
+            "SAR_SC_S",
+            "SAR_WS_S"
+        ],
+        "sar:center_frequency": [
+            9.65
+        ],
+        "sar:observation_direction": [
+            "right",
+            "left"
+        ]
+    },
+    "item_assets": {
+        "thumbnail": {
+            "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+            "roles": [
+                "thumbnail"
+            ],
+            "title": "Thumbnail Image"
+        }
+    }
+}

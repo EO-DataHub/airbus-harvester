@@ -1,0 +1,189 @@
+{
+    "SAR": {
+        "collection_name": "airbus_sar_data",
+        "url": "https://sar.api.oneatlas.airbus.com/v1/sar/catalogue/replication",
+        "auth_env": "prod",
+        "body": null,
+        "request_method": "GET",
+        "stac_properties": {
+            "access": [
+                "HTTPServer"
+            ],
+            "sar:frequency_band": "X",
+            "sar:center_frequency": 9.65
+        },
+        "stac_properties_map": {
+            "datetime": "catalogueTime",
+            "start_datetime": "startTime",
+            "end_datetime": "stopTime",
+            "updated": "lastUpdateTime",
+            "sar:instrument_mode": "sensorMode",
+            "sar:polarizations": "polarizationChannels",
+            "sar:observation_direction": "lookDirection",
+            "sar:product_type": "productType",
+            "sat:platform_international_designator": "satellite",
+            "sat:orbit_state": "pathDirection",
+            "sat:relative_orbit": "relativeOrbit",
+            "sat:absolute_orbit": "absoluteOrbit"
+        },
+        "external_urls": [
+            {
+                "name": "thumbnail",
+                "path": "properties.quicklookUrl"
+            }
+        ],
+        "stac_extensions": [
+            "https://stac-extensions.github.io/sar/v1.0.0/schema.json",
+            "https://stac-extensions.github.io/sat/v1.0.0/schema.json"
+        ],
+        "item_id_key": "acquisitionId",
+        "pagination_method": "link"
+    },
+    "SPOT": {
+        "collection_name": "airbus_spot_data",
+        "url": "https://search.foundation.api.oneatlas.airbus.com/api/v2/opensearch",
+        "auth_env": null,
+        "body": {
+            "itemsPerPage": 200,
+            "sortBy": "-lastUpdateDate",
+            "startPage": 1,
+            "constellation": "SPOT",
+            "processingLevel": "ALBUM",
+            "workspace": "public",
+            "index":"all"
+        },
+        "request_method": "POST",
+        "stac_properties": {
+            "access": [
+                "HTTPServer"
+            ]
+        },
+        "stac_properties_map": {
+            "datetime": "acquisitionDate",
+            "updated": "lastUpdateDate",
+            "gsd": "resolution",
+            "eo:cloud_cover": "cloudCover",
+            "eo:snow_cover": "snowCover",
+            "view:azimuth": "azimuthAngle",
+            "view:sun_azimuth": "illuminationAzimuthAngle",
+            "view:sun_elevation": "illuminationElevationAngle",
+            "view:incidence_angle": "incidenceAngle"
+
+        },
+        "external_urls": [
+            {
+                "name": "quicklook",
+                "path": "_links.quicklook.href"
+            },
+            {
+                "name": "thumbnail",
+                "path": "_links.thumbnail.href"
+            }
+        ],
+        "stac_extensions": [
+            "https://stac-extensions.github.io/eo/v2.0.0/schema.json",
+            "https://stac-extensions.github.io/sat/v1.0.0/schema.json",
+            "https://stac-extensions.github.io/view/v1.0.0/schema.json"
+        ],
+        "item_id_key": "acquisitionIdentifier",
+        "pagination_method": "counter"
+    },
+    "PHR": {
+        "collection_name": "airbus_phr_data",
+        "url": "https://search.foundation.api.oneatlas.airbus.com/api/v2/opensearch",
+        "auth_env": null,
+        "body": {
+            "itemsPerPage": 200,
+            "sortBy": "-lastUpdateDate",
+            "startPage": 1,
+            "constellation": "PHR",
+            "processingLevel": "ALBUM",
+            "workspace": "public",
+            "index":"all"
+        },
+        "request_method": "POST",
+        "stac_properties": {
+            "access": [
+                "HTTPServer"
+            ]
+        },
+        "stac_properties_map": {
+            "datetime": "acquisitionDate",
+            "updated": "lastUpdateDate",
+            "gsd": "resolution",
+            "eo:cloud_cover": "cloudCover",
+            "eo:snow_cover": "snowCover",
+            "view:azimuth": "azimuthAngle",
+            "view:sun_azimuth": "illuminationAzimuthAngle",
+            "view:sun_elevation": "illuminationElevationAngle",
+            "view:incidence_angle": "incidenceAngle"
+
+        },
+        "external_urls": [
+            {
+                "name": "quicklook",
+                "path": "_links.quicklook.href"
+            },
+            {
+                "name": "thumbnail",
+                "path": "_links.thumbnail.href"
+            }
+        ],
+        "stac_extensions": [
+            "https://stac-extensions.github.io/eo/v2.0.0/schema.json",
+            "https://stac-extensions.github.io/sat/v1.0.0/schema.json",
+            "https://stac-extensions.github.io/view/v1.0.0/schema.json"
+        ],
+        "item_id_key": "acquisitionIdentifier",
+        "pagination_method": "counter"
+    },
+    "PNEO": {
+        "collection_name": "airbus_pneo_data",
+        "url": "https://search.foundation.api.oneatlas.airbus.com/api/v2/opensearch",
+        "auth_env": "prod",
+        "body": {
+            "itemsPerPage": 200,
+            "sortBy": "-lastUpdateDate",
+            "constellation": "PNEO",
+            "startPage": 1,
+            "processingLevel": "ALBUM",
+            "workspace": "public-pneo",
+            "index":"all"
+        },
+        "request_method": "POST",
+        "stac_properties": {
+            "access": [
+                "HTTPServer"
+            ]
+        },
+        "stac_properties_map": {
+            "datetime": "acquisitionDate",
+            "updated": "lastUpdateDate",
+            "gsd": "resolution",
+            "eo:cloud_cover": "cloudCover",
+            "eo:snow_cover": "snowCover",
+            "view:azimuth": "azimuthAngle",
+            "view:sun_azimuth": "illuminationAzimuthAngle",
+            "view:sun_elevation": "illuminationElevationAngle",
+            "view:incidence_angle": "incidenceAngle"
+
+        },
+        "external_urls": [
+            {
+                "name": "quicklook",
+                "path": "_links.quicklook.href"
+            },
+            {
+                "name": "thumbnail",
+                "path": "_links.thumbnail.href"
+            }
+        ],
+        "stac_extensions": [
+            "https://stac-extensions.github.io/eo/v2.0.0/schema.json",
+            "https://stac-extensions.github.io/sat/v1.0.0/schema.json",
+            "https://stac-extensions.github.io/view/v1.0.0/schema.json"
+        ],
+        "item_id_key": "acquisitionIdentifier",
+        "pagination_method": "counter"
+    }
+}

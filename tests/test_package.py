@@ -14,7 +14,7 @@ from airbus_harvester.__main__ import (
     generate_stac_collection,
     generate_stac_item,
     get_stac_collection_summary,
-    handle_quicklook_url,
+    handle_external_url,
     harvest,
     make_catalogue,
     modify_value,
@@ -154,6 +154,42 @@ def mock_data():
     }
 
 
+@pytest.fixture
+def mock_config():
+    return {
+        "collection_name": "airbus_sar_data",
+        "url": "https://sar.api.oneatlas.airbus.com/v1/sar/catalogue/replication",
+        "auth_env": "prod",
+        "body": None,
+        "stac_properties": {
+            "access": ["HTTPServer"],
+            "sar:frequency_band": "X",
+            "sar:center_frequency": 9.65,
+        },
+        "stac_properties_map": {
+            "datetime": "catalogueTime",
+            "start_datetime": "startTime",
+            "end_datetime": "stopTime",
+            "updated": "lastUpdateTime",
+            "sar:instrument_mode": "sensorMode",
+            "sar:polarizations": "polarizationChannels",
+            "sar:observation_direction": "lookDirection",
+            "sar:product_type": "productType",
+            "sat:platform_international_designator": "satellite",
+            "sat:orbit_state": "pathDirection",
+            "sat:relative_orbit": "relativeOrbit",
+            "sat:absolute_orbit": "absoluteOrbit",
+        },
+        "external_urls": [{"name": "thumbnail", "path": "properties.quicklookUrl"}],
+        "stac_extensions": [
+            "https://stac-extensions.github.io/sar/v1.0.0/schema.json",
+            "https://stac-extensions.github.io/sat/v1.0.0/schema.json",
+        ],
+        "item_id_key": "acquisitionId",
+        "pagination_method": "link",
+    }
+
+
 @moto.mock_aws
 @patch("airbus_harvester.__main__.PulsarClient")
 def test_harvest(mock_create_client, requests_mock, mock_catalogue_response):
@@ -177,6 +213,7 @@ def test_harvest(mock_create_client, requests_mock, mock_catalogue_response):
     s3.create_bucket(Bucket=bucket_name)
 
     os.environ["PULSAR_URL"] = "mypulsar.com/pulsar"
+    os.environ["HARVESTER_CONFIG_KEY"] = "SAR"
 
     runner = CliRunner()
     runner.invoke(harvest, f"workspace catalogue {bucket_name}".split())
@@ -224,14 +261,14 @@ def test_get_stac_collection_summary(mock_data, mock_response):
     assert actual_summary == expected_summary
 
 
-def test_generate_stac_collection(mock_data):
+def test_generate_stac_collection(mock_data, mock_config):
     mock_data_summary = {
         "bbox": [1, 2, 3, 4],
         "start_time": "2024-01-22T19:42:44.735Z",
         "stop_time": "2024-01-22T19:42:46.446Z",
     }
 
-    actual_collection = generate_stac_collection(mock_data_summary)
+    actual_collection = generate_stac_collection(mock_data_summary, mock_config)
     json_collection = json.loads(actual_collection)
 
     assert isinstance(actual_collection, str)
@@ -252,14 +289,18 @@ def test_generate_stac_collection(mock_data):
     }.issubset(set(json_collection.keys()))
 
 
-def test_handle_quicklook_url__with_quicklook():
+def test_handle_external_url__with_quicklook(mock_config):
+    external_url = mock_config["external_urls"][0]
+
     mapped_keys = set()
     links = []
     assets = {}
 
     data = {"properties": {"quicklookUrl": "www.test.com"}}
 
-    handle_quicklook_url(data, links, assets, mapped_keys)
+    handle_external_url(
+        data, links, assets, mapped_keys, external_url["name"], external_url["path"]
+    )
 
     assert len(assets) == len(links) == len(mapped_keys) == 1
     assert "quicklookUrl" in mapped_keys
@@ -267,14 +308,18 @@ def test_handle_quicklook_url__with_quicklook():
     assert {"href", "type"}.issubset(assets["thumbnail"].keys())
 
 
-def test_handle_quicklook_url__without_quicklook():
+def test_handle_external_url__without_quicklook(mock_config):
+    external_url = mock_config["external_urls"][0]
+
     mapped_keys = set()
     links = []
     assets = {}
 
     data = {"properties": {"notQuicklookUrl": "www.test.com"}}
 
-    handle_quicklook_url(data, links, assets, mapped_keys)
+    handle_external_url(
+        data, links, assets, mapped_keys, external_url["name"], external_url["path"]
+    )
 
     assert len(assets) == len(links) == len(mapped_keys) == 0
 
@@ -297,8 +342,8 @@ def test_modify_value(key, value, expected_return_value):
     assert expected_return_value == actual_return_value
 
 
-def test_generate_stac_item(mock_response):
-    actual_item = generate_stac_item(mock_response["features"][0])
+def test_generate_stac_item(mock_response, mock_config):
+    actual_item = generate_stac_item(mock_response["features"][0], mock_config)
     json_collection = json.loads(actual_item)
 
     assert isinstance(actual_item, str)
@@ -331,11 +376,29 @@ def test_make_catalogue():
 
 
 def test_add_to_all_data_summary(mock_response):
-    data = mock_response["features"][0]
+    data = {
+        "type": "Feature",
+        "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+                [
+                    [-27.9837603, 38.6070725],
+                    [-28.0150768, 38.7135605],
+                    [-28.1373002, 38.6958769],
+                    [-28.1166933, 38.5878242],
+                    [-27.9837603, 38.6070725],
+                ]
+            ],
+        },
+        "properties": {
+            "start_datetime": "2024-01-22T19:42:44.735Z",
+            "end_datetime": "2024-01-22T19:42:46.446Z",
+        },
+    }
     all_data = {"coordinates": [], "start_time": [], "stop_time": []}
 
     all_data = add_to_catalogue_data_summary(all_data, data)
 
     assert all_data["coordinates"][0] == data["geometry"]["coordinates"][0][0]
-    assert all_data["start_time"][0] == data["properties"]["startTime"]
-    assert all_data["stop_time"][0] == data["properties"]["stopTime"]
+    assert all_data["start_time"][0] == data["properties"]["start_datetime"]
+    assert all_data["stop_time"][0] == data["properties"]["end_datetime"]

@@ -163,5 +163,8 @@ cython_debug/
 
 *.bak
 
+# VS Code
+.vscode/
+
 # Configuration files
 .pre-commit-config.yaml
