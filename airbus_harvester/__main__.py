@@ -207,15 +207,25 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     return output_data
 
 
-def send_pulsar_message(output_data: dict, pulsar_client: PulsarClient) -> None:
+def send_pulsar_message(output_data: dict, pulsar_client: PulsarClient, retries: int = 0) -> None:
     """Sends pulsar message for a given set of output data"""
+    try:
+        producer = pulsar_client.create_producer(
+            topic="harvested",
+            producer_name=f"stac_harvester/{output_data['id']}",
+            chunking_enabled=True,
+        )
+        producer.send((json.dumps(output_data)).encode("utf-8"))
+        producer.close()
+        logging.info(f"Sent harvested message {output_data}")
 
-    producer = pulsar_client.create_producer(
-        topic="harvested", producer_name="stac_harvester/airbus", chunking_enabled=True
-    )
-    producer.send((json.dumps(output_data)).encode("utf-8"))
-    producer.close()
-    logging.info(f"Sent harvested message {output_data}")
+    except Exception as e:
+        if retries < 3:
+            logging.info(f"Unable to send pulsar message. Retrying attempt {retries}")
+            send_pulsar_message(output_data, pulsar_client, retries + 1)
+        else:
+            logging.info("Unable to send pulsar message. Maximum retries reached")
+            logging.exception(e)
 
 
 def compare_to_previous_version(
