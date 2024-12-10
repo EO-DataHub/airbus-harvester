@@ -1,0 +1,42 @@
+{
+    "type": "Collection",
+    "id": "airbus_phr_data",
+    "stac_version": "1.0.0",
+    "stac_extensions": [],
+    "description": "The identical Pléiades 1A and Pléiades 1B satellites deliver 50cm imagery products with a 20km swath. Their location accuracy and image quality are excellent, making them an ideal source of data for both civil or military projects. The space and ground segment have been designed to provide data in record time, ensuring daily revisit capacity anywhere on the globe and unrivalled reliability when it comes to collecting new images.",
+    "links": [],
+    "title": "Airbus PHR Data",
+    "geometry": {
+        "type": "Polygon"
+    },
+    "extent": {
+        "spatial": {
+            "bbox": []
+        },
+        "temporal": {
+            "interval": []
+        }
+    },
+    "license": "proprietary",
+    "keywords": [
+        "airbus"
+    ],
+    "summaries": {
+        "platform": [
+            "PHR1A",
+            "PHR1B"
+        ],
+        "constellation": [
+            "PHR"
+        ]
+    },
+    "item_assets": {
+        "thumbnail": {
+            "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+            "roles": [
+                "thumbnail"
+            ],
+            "title": "Thumbnail Image"
+        }
+    }
+}
