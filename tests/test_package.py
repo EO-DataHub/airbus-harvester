@@ -430,9 +430,9 @@ def test_modify_value(key, value, expected_return_value):
 
 def test_generate_stac_item(mock_response, mock_config):
     actual_item = generate_stac_item(mock_response["features"][0], mock_config)
-    json_collection = json.loads(actual_item)
+    json_collection = actual_item
 
-    assert isinstance(actual_item, str)
+    assert isinstance(actual_item, dict)
     assert {
         "type",
         "id",
@@ -458,7 +458,7 @@ def test_make_catalogue():
 
     actual_catalogue = make_catalogue()
 
-    assert json.loads(actual_catalogue) == expected_catalogue
+    assert actual_catalogue == expected_catalogue
 
 
 def test_add_to_all_data_summary(mock_response):

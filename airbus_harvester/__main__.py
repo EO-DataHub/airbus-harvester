@@ -110,13 +110,8 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                 file_name = f"{entry['properties'][config['item_id_key']]}.json"
                 key = f"{key_root}/{config['collection_name']}/{file_name}"
 
-                logging.error(previously_harvested)
-
                 previous_hash = previously_harvested.pop(key, None)
-                logging.error(key)
-                logging.error(previous_hash)
                 file_hash = get_file_hash(json.dumps(data))
-                logging.error(file_hash)
 
                 if not previous_hash or previous_hash != file_hash:
                     # Data was not harvested previously
@@ -126,9 +121,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
             except KeyError:
                 logging.error(f"Invalid entry in {next_url}")
 
-            catalogue_data_summary = add_to_catalogue_data_summary(
-                catalogue_data_summary, json.loads(data)
-            )
+            catalogue_data_summary = add_to_catalogue_data_summary(catalogue_data_summary, data)
 
         catalogue_data_summary = simplify_catalogue_data_summary(catalogue_data_summary)
 
@@ -431,7 +424,7 @@ def modify_value(key, value) -> str:
     return value
 
 
-def generate_stac_item(data: dict, config: dict) -> str:
+def generate_stac_item(data: dict, config: dict) -> dict:
     """Catalogue items for Airbus data"""
     coordinates = data["geometry"]["coordinates"][0]
     bbox = coordinates_to_bbox(coordinates)
@@ -469,10 +462,10 @@ def generate_stac_item(data: dict, config: dict) -> str:
         "assets": assets,
     }
 
-    return json.dumps(stac_item, indent=4)
+    return stac_item
 
 
-def make_catalogue() -> str:
+def make_catalogue() -> dict:
     """Top level catalogue for Airbus data"""
     stac_catalog = {
         "type": "Catalog",
@@ -481,7 +474,7 @@ def make_catalogue() -> str:
         "description": "Airbus Datasets",
         "links": [],
     }
-    return json.dumps(stac_catalog, indent=4)
+    return stac_catalog
 
 
 if __name__ == "__main__":
