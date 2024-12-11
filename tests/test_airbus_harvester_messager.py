@@ -156,6 +156,6 @@ def test_gen_empty_catalogue_message():
         "repository": "",
         "branch": "",
         "bucket_name": "files_bucket_name",
-        "source": "airbus",
+        "source": "/",
         "target": "/",
     }

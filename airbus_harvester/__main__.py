@@ -10,7 +10,6 @@ import requests
 from eodhp_utils.aws.s3 import get_file_s3, upload_file_s3
 from eodhp_utils.runner import get_boto3_session, get_pulsar_client, setup_logging
 from inflection import underscore
-from pulsar import Client as PulsarClient
 
 from airbus_harvester.airbus_harvester_messager import AirbusHarvesterMessager
 
@@ -48,14 +47,16 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
     s3_client = get_boto3_session().client("s3")
 
+    config_key = os.getenv("HARVESTER_CONFIG_KEY", "")
+    config = load_config("airbus_harvester/config.json").get(config_key.upper())
+
     pulsar_client = get_pulsar_client()
     producer = pulsar_client.create_producer(
         topic="harvested",
-        producer_name="stac_harvester/airbus",
+        producer_name=f"stac_harvester/airbus/{config['collection_name']}",
         chunking_enabled=True,
     )
-    config_key = os.getenv("HARVESTER_CONFIG_KEY", "")
-    config = load_config("airbus_harvester/config.json").get(config_key.upper())
+
     if not config:
         logging.error(f"Configuration key {config_key} not found in config file.")
 
@@ -169,6 +170,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                 "deleted_keys": [],
             }
             airbus_harvester_messager.consume(msg)
+            upload_file_s3(json.dumps(latest_harvested), s3_bucket, metadata_s3_key, s3_client)
             harvested_data = {}
 
     # Do not updated collection
@@ -185,27 +187,6 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     airbus_harvester_messager.consume(msg)
 
     upload_file_s3(json.dumps(latest_harvested), s3_bucket, metadata_s3_key, s3_client)
-
-
-def send_pulsar_message(output_data: dict, pulsar_client: PulsarClient, retries: int = 0) -> None:
-    """Sends pulsar message for a given set of output data"""
-    try:
-        producer = pulsar_client.create_producer(
-            topic="harvested",
-            producer_name=f"stac_harvester/{output_data['id']}",
-            chunking_enabled=True,
-        )
-        producer.send((json.dumps(output_data)).encode("utf-8"))
-        producer.close()
-        logging.info(f"Sent harvested message {output_data}")
-
-    except Exception as e:
-        if retries < 3:
-            logging.info(f"Unable to send pulsar message. Retrying attempt {retries}")
-            send_pulsar_message(output_data, pulsar_client, retries + 1)
-        else:
-            logging.info("Unable to send pulsar message. Maximum retries reached")
-            logging.exception(e)
 
 
 def compare_to_previous_version(
