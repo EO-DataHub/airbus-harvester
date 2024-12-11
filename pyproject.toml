@@ -19,7 +19,7 @@ description = "Harvest Airbus data"
 readme = "README.md"
 
 # Our target version is Python 3.11, but it may work with earlier versions.
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 
 license = {file = "LICENSE"}
 
@@ -71,7 +71,7 @@ dependencies = [
     "pystac-client",
     "pystac",
     "inflection",
-    "eodhp-utils @ git+https://github.com/EO-DataHub/eodhp-utils.git@v0.1.1",
+    "eodhp-utils @ git+https://github.com/EO-DataHub/eodhp-utils.git@v0.1.4",
 ]
 
 # List additional groups of dependencies here (e.g. development
