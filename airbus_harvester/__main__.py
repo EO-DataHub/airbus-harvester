@@ -175,6 +175,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                 "harvested_data": harvested_data,
                 "deleted_keys": [],
             }
+            airbus_harvester_messager.consume(msg)
             harvested_data = {}
 
     # Do not updated collection
