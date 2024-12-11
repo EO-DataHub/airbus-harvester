@@ -42,6 +42,6 @@ class AirbusHarvesterMessager(Messager[str]):
             "repository": "",
             "branch": "",
             "bucket_name": self.output_bucket,
-            "source": "airbus",
+            "source": "/",
             "target": "/",
         }
