@@ -1,5 +1,6 @@
 import json
 import os
+import tempfile
 from unittest import mock
 from unittest.mock import patch
 
@@ -30,6 +31,17 @@ def setenvvar(monkeypatch):
         for k, v in envvars.items():
             monkeypatch.setenv(k, v)
         yield
+
+
+@pytest.fixture
+def parameters() -> dict:
+    """Parameters used by stac harvester tests"""
+    return {
+        "metadata_bucket_name": "test_metadata_bucket",
+        "files_bucket_name": "test_files_bucket",
+        "url": "https://test-url.co.uk/collection",
+        "previously_harvested": {"some/file/key/to/delete.json": "hash"},
+    }
 
 
 @pytest.fixture
@@ -191,7 +203,7 @@ def mock_config():
 
 
 @moto.mock_aws
-@patch("airbus_harvester.__main__.PulsarClient")
+@patch("airbus_harvester.__main__.get_pulsar_client")
 def test_harvest(mock_create_client, requests_mock, mock_catalogue_response):
     requests_mock.get(
         "https://sar.api.oneatlas.airbus.com/v1/sar/catalogue/replication",
@@ -238,6 +250,80 @@ def test_harvest(mock_create_client, requests_mock, mock_catalogue_response):
     assert call_args["bucket_name"] == bucket_name
     assert len(call_args["added_keys"]) == 3
     assert len(call_args["updated_keys"]) == len(call_args["deleted_keys"]) == 0
+
+
+@moto.mock_aws
+@patch("airbus_harvester.__main__.get_pulsar_client")
+def test_harvest_delete(
+    mock_create_client, requests_mock, mock_catalogue_response, mock_config, parameters
+):
+    requests_mock.get(
+        "https://sar.api.oneatlas.airbus.com/v1/sar/catalogue/replication",
+        text=json.dumps(mock_catalogue_response),
+    )
+    requests_mock.post(
+        "https://authenticate.foundation.api.oneatlas.airbus.com/auth/realms/IDP/protocol/openid-connect/token",
+        text='{"access_token": "my_access_token"}',
+    )
+
+    mock_client = mock.MagicMock()
+    mock_producer = mock.MagicMock()
+    mock_create_client.return_value = mock_client
+    mock_client.create_producer.return_value = mock_producer
+
+    bucket_name = "my-bucket"
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Create local file imitating stored harvested files from a previous run
+        harvested_file_name = "harvested.txt"
+        folder_path = f"{temp_dir}/test"
+        os.makedirs(folder_path)
+        local_file_path = f"{folder_path}/{harvested_file_name}"
+        with open(local_file_path, "w") as temp_file:
+            temp_file.write(json.dumps(parameters["previously_harvested"]))
+            temp_file.flush()
+
+        # Create S3 resources and upload file to S3
+        s3 = boto3.client("s3", region_name="us-east-1")
+        s3.create_bucket(Bucket=bucket_name)
+        s3.upload_file(
+            local_file_path,
+            bucket_name,
+            f"harvested-metadata/{mock_config['collection_name']}",
+        )
+        s3.upload_file(
+            local_file_path,  # any example file
+            bucket_name,
+            "git-harvester/some/file/key/to/delete.json",
+        )
+        s3 = boto3.resource("s3")
+        my_bucket = s3.Bucket(bucket_name)
+        assert len(list(my_bucket.objects.all())) == 2
+
+    os.environ["PULSAR_URL"] = "mypulsar.com/pulsar"
+    os.environ["HARVESTER_CONFIG_KEY"] = "SAR"
+
+    runner = CliRunner()
+    runner.invoke(harvest, f"workspace catalogue {bucket_name}".split())
+
+    assert len(list(my_bucket.objects.all())) == 4
+
+    args, kwargs = mock_producer.send.call_args
+    call_args = json.loads(args[0])
+    assert {
+        "id",
+        "workspace",
+        "bucket_name",
+        "added_keys",
+        "updated_keys",
+        "deleted_keys",
+        "source",
+        "target",
+    }.issubset(call_args.keys())
+    assert call_args["bucket_name"] == bucket_name
+    assert len(call_args["added_keys"]) == 3
+    assert len(call_args["updated_keys"]) == 0
+    assert len(call_args["deleted_keys"]) == 1
 
 
 def test__coordinates_to_bbox__success(mock_response):
