@@ -15,6 +15,10 @@ from airbus_harvester.airbus_harvester_messager import AirbusHarvesterMessager
 
 setup_logging()
 
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+)
+
 minimum_message_entries = int(os.environ.get("MINIMUM_MESSAGE_ENTRIES", 100))
 
 
@@ -102,6 +106,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
     while next_url:
         url_count += 1
+        logging.info("URL COUNT IS: " + str(url_count))
 
         body = get_next_page(next_url, config)
 
