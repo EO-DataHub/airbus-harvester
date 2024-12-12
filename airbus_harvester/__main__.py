@@ -106,7 +106,6 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
     while next_url:
         url_count += 1
-        logging.error("URL COUNT IS: " + str(url_count))
 
         body = get_next_page(next_url, config)
 
