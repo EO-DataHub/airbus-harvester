@@ -74,13 +74,13 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     harvested_data = {}
     latest_harvested = {}
 
-    logging.info(f"Harvesting from Airbus {config_key}")
+    logging.error(f"Harvesting from Airbus {config_key}")
 
     key_root = "supported-datasets/airbus"
 
     metadata_s3_key = f"harvested-metadata/{config['collection_name']}"
     previously_harvested = get_metadata(s3_bucket, metadata_s3_key, s3_client)
-    logging.info(f"Previously harvested URLs: {previously_harvested}")
+    logging.error(f"Previously harvested URLs: {previously_harvested}")
     latest_harvested = {}
 
     catalogue_data = make_catalogue()
@@ -89,7 +89,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     file_hash = get_file_hash(json.dumps(catalogue_data))
     if not previous_hash or previous_hash != file_hash:
         # URL was not harvested previously
-        logging.info(f"Added: {catalogue_key}")
+        logging.error(f"Added: {catalogue_key}")
         harvested_data[catalogue_key] = catalogue_data
         latest_harvested[catalogue_key] = file_hash
 
@@ -106,7 +106,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
     while next_url:
         url_count += 1
-        logging.info("URL COUNT IS: " + str(url_count))
+        logging.error("URL COUNT IS: " + str(url_count))
 
         body = get_next_page(next_url, config)
 
@@ -121,9 +121,11 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
                 if not previous_hash or previous_hash != file_hash:
                     # Data was not harvested previously
-                    logging.info(f"Added: {key}")
+                    logging.error(f"Added: {key}")
                     harvested_data[key] = data
                     latest_harvested[key] = file_hash
+                else:
+                    logging.error(f"Skipping: {key}")
             except KeyError:
                 logging.error(f"Invalid entry in {next_url}")
 
@@ -148,7 +150,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                     ] = f"[2018-10-03T12:00:00Z,{entry['properties']['lastUpdateDate']}]"
                 config["body"]["startPage"] = (url_count % 50) + 1
 
-        logging.info(f"Page {url_count} next URL: {next_url}")
+        logging.error(f"Page {url_count} next URL: {next_url}")
 
         summary = get_stac_collection_summary(catalogue_data_summary)
 
@@ -158,10 +160,10 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         last_run_hash = latest_harvested.get(collection_key)
         previous_hash = last_run_hash if last_run_hash else previously_harvested.get(collection_key)
 
-        file_hash = get_file_hash(json.dumps(collection_key))
+        file_hash = get_file_hash(json.dumps(collection_data))
         if not previous_hash or previous_hash != file_hash:
             # Data was not harvested previously
-            logging.info(f"Added: {collection_key}")
+            logging.error(f"Added: {collection_key}")
             harvested_data[collection_key] = collection_data
             latest_harvested[collection_key] = file_hash
 
