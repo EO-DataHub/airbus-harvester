@@ -355,9 +355,8 @@ def test_generate_stac_collection(mock_data, mock_config):
     }
 
     actual_collection = generate_stac_collection(mock_data_summary, mock_config)
-    json_collection = json.loads(actual_collection)
 
-    assert isinstance(actual_collection, str)
+    assert isinstance(actual_collection, dict)
     assert {
         "type",
         "id",
@@ -372,7 +371,7 @@ def test_generate_stac_collection(mock_data, mock_config):
         "keywords",
         "summaries",
         "item_assets",
-    }.issubset(set(json_collection.keys()))
+    }.issubset(set(actual_collection.keys()))
 
 
 def test_handle_external_url__with_quicklook(mock_config):
