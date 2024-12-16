@@ -7,16 +7,16 @@ from json import JSONDecodeError
 import boto3
 import click
 import requests
-from botocore.exceptions import ClientError
-from eodhp_utils.aws.s3 import upload_file_s3
+from eodhp_utils.aws.s3 import get_file_s3, upload_file_s3
+from eodhp_utils.runner import get_boto3_session, get_pulsar_client, setup_logging
 from inflection import underscore
-from pulsar import Client as PulsarClient
+
+from airbus_harvester.airbus_harvester_messager import AirbusHarvesterMessager
+
+setup_logging()
 
 logging.basicConfig(
-    level=logging.DEBUG if os.getenv("DEBUG") else logging.INFO,
-    format="%(asctime)s %(levelname)s %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    handlers=[logging.StreamHandler()],
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 
 minimum_message_entries = int(os.environ.get("MINIMUM_MESSAGE_ENTRIES", 100))
@@ -49,40 +49,49 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     containing all added, updated, and deleted links since the last time the catalog was
     harvested"""
 
-    if os.getenv("AWS_ACCESS_KEY") and os.getenv("AWS_SECRET_ACCESS_KEY"):
-        session = boto3.session.Session(
-            aws_access_key_id=os.environ["AWS_ACCESS_KEY"],
-            aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
-        )
-        s3_client = session.client("s3")
-    else:
-        s3_client = boto3.client("s3")
-
-    pulsar_url = os.environ.get("PULSAR_URL")
-    pulsar_client = PulsarClient(pulsar_url)
+    s3_client = get_boto3_session().client("s3")
 
     config_key = os.getenv("HARVESTER_CONFIG_KEY", "")
     config = load_config("airbus_harvester/config.json").get(config_key.upper())
+
+    pulsar_client = get_pulsar_client()
+    producer = pulsar_client.create_producer(
+        topic="harvested",
+        producer_name=f"stac_harvester/airbus/{config['collection_name']}",
+        chunking_enabled=True,
+    )
+
     if not config:
         logging.error(f"Configuration key {config_key} not found in config file.")
 
-    harvested_keys = {"added_keys": set(), "updated_keys": set()}
+    airbus_harvester_messager = AirbusHarvesterMessager(
+        s3_client=s3_client,
+        output_bucket=s3_bucket,
+        cat_output_prefix="git-harvester/",
+        producer=producer,
+    )
 
-    logging.info(f"Harvesting from Airbus {config_key}")
+    harvested_data = {}
+    latest_harvested = {}
 
-    key_root = "git-harvester/supported-datasets/airbus"
+    logging.error(f"Harvesting from Airbus {config_key}")
+
+    key_root = "supported-datasets/airbus"
 
     metadata_s3_key = f"harvested-metadata/{config['collection_name']}"
     previously_harvested = get_metadata(s3_bucket, metadata_s3_key, s3_client)
-    logging.info(f"Previously harvested URLs: {previously_harvested}")
+    logging.error(f"Previously harvested URLs: {previously_harvested}")
     latest_harvested = {}
 
     catalogue_data = make_catalogue()
-    catalogue_key = "git-harvester/supported-datasets/airbus.json"
+    catalogue_key = "supported-datasets/airbus.json"
     previous_hash = previously_harvested.pop(catalogue_key, None)
-    harvested_keys, latest_harvested[catalogue_key] = compare_to_previous_version(
-        catalogue_key, catalogue_data, previous_hash, harvested_keys, s3_bucket, s3_client
-    )
+    file_hash = get_file_hash(json.dumps(catalogue_data))
+    if not previous_hash or previous_hash != file_hash:
+        # URL was not harvested previously
+        logging.error(f"Added: {catalogue_key}")
+        harvested_data[catalogue_key] = catalogue_data
+        latest_harvested[catalogue_key] = file_hash
 
     collection_key = f"{key_root}/{config['collection_name']}.json"
 
@@ -107,15 +116,19 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                 key = f"{key_root}/{config['collection_name']}/{file_name}"
 
                 previous_hash = previously_harvested.pop(key, None)
-                harvested_keys, latest_harvested[key] = compare_to_previous_version(
-                    key, data, previous_hash, harvested_keys, s3_bucket, s3_client
-                )
+                file_hash = get_file_hash(json.dumps(data))
+
+                if not previous_hash or previous_hash != file_hash:
+                    # Data was not harvested previously
+                    logging.error(f"Added: {key}")
+                    harvested_data[key] = data
+                    latest_harvested[key] = file_hash
+                else:
+                    logging.error(f"Skipping: {key}")
             except KeyError:
                 logging.error(f"Invalid entry in {next_url}")
 
-            catalogue_data_summary = add_to_catalogue_data_summary(
-                catalogue_data_summary, json.loads(data)
-            )
+            catalogue_data_summary = add_to_catalogue_data_summary(catalogue_data_summary, data)
 
         catalogue_data_summary = simplify_catalogue_data_summary(catalogue_data_summary)
 
@@ -136,7 +149,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                     ] = f"[2018-10-03T12:00:00Z,{entry['properties']['lastUpdateDate']}]"
                 config["body"]["startPage"] = (url_count % 50) + 1
 
-        logging.info(f"Page {url_count} next URL: {next_url}")
+        logging.error(f"Page {url_count} next URL: {next_url}")
 
         summary = get_stac_collection_summary(catalogue_data_summary)
 
@@ -146,86 +159,40 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         last_run_hash = latest_harvested.get(collection_key)
         previous_hash = last_run_hash if last_run_hash else previously_harvested.get(collection_key)
 
-        harvested_keys, latest_harvested[collection_key] = compare_to_previous_version(
-            collection_key, collection_data, previous_hash, harvested_keys, s3_bucket, s3_client
-        )
+        file_hash = get_file_hash(json.dumps(collection_data))
+        if not previous_hash or previous_hash != file_hash:
+            # Data was not harvested previously
+            logging.error(f"Added: {collection_key}")
+            harvested_data[collection_key] = collection_data
+            latest_harvested[collection_key] = file_hash
 
         latest_harvested["summary"] = catalogue_data_summary
 
-        # Don't send empty or nearly empty pulsar messages
-        if (
-            len(harvested_keys["added_keys"])
-            + len(harvested_keys["updated_keys"])
-            + len(deleted_keys)
-            > minimum_message_entries
-        ):
-            # Record harvested hash data in S3
-            upload_file_s3(json.dumps(latest_harvested), s3_bucket, metadata_s3_key, s3_client)
+        if len(harvested_data.keys()) >= minimum_message_entries:
 
-            output_data = {
-                "id": f"{workspace_name}/{config['collection_name']}_{url_count}",
-                "workspace": workspace_name,
-                "bucket_name": s3_bucket,
-                "added_keys": list(harvested_keys["added_keys"]),
-                "updated_keys": list(harvested_keys["updated_keys"]),
-                "deleted_keys": deleted_keys,
-                "source": "airbus",
-                "target": "/",
+            # Send message for altered keys
+            msg = {
+                "harvested_data": harvested_data,
+                "deleted_keys": [],
             }
+            airbus_harvester_messager.consume(msg)
+            upload_file_s3(json.dumps(latest_harvested), s3_bucket, metadata_s3_key, s3_client)
+            harvested_data = {}
 
-            send_pulsar_message(output_data, pulsar_client)
-
-            harvested_keys = {"added_keys": set(), "updated_keys": set()}
-
-    upload_file_s3(json.dumps(latest_harvested), s3_bucket, metadata_s3_key, s3_client)
-
+    # Do not updated collection
     if latest_harvested.get(collection_key) == previously_harvested.get(collection_key):
-        harvested_keys["updated_keys"].discard(collection_key)
+        harvested_data.discard(collection_key)
 
     # Remove this otherwise it will be marked for deletion
     previously_harvested.pop(collection_key, None)
 
     deleted_keys = list(previously_harvested.keys())
-    output_data = {
-        "id": f"{workspace_name}/airbus_final",
-        "workspace": workspace_name,
-        "bucket_name": s3_bucket,
-        "added_keys": list(harvested_keys["added_keys"]),
-        "updated_keys": list(harvested_keys["updated_keys"]),
-        "deleted_keys": deleted_keys,
-        "source": "airbus",
-        "target": "/",
-    }
 
-    if any([harvested_keys["added_keys"], harvested_keys["updated_keys"], deleted_keys]):
-        # Send Pulsar message containing harvested links
-        send_pulsar_message(output_data, pulsar_client)
-        logging.info(f"Sent harvested message {output_data}")
-    else:
-        logging.info("No changes made to previously harvested state")
+    # Send message for altered keys
+    msg = {"harvested_data": harvested_data, "deleted_keys": deleted_keys}
+    airbus_harvester_messager.consume(msg)
 
-    return output_data
-
-
-def send_pulsar_message(output_data: dict, pulsar_client: PulsarClient, retries: int = 0) -> None:
-    """Sends pulsar message for a given set of output data"""
-    try:
-        producer = pulsar_client.create_producer(
-            topic="harvested",
-            producer_name=f"stac_harvester/{output_data['id']}",
-            chunking_enabled=True,
-        )
-        producer.send((json.dumps(output_data)).encode("utf-8"))
-        producer.close()
-        logging.info(f"Sent harvested message {output_data}")
-
-    except Exception as e:
-        if retries < 3:
-            logging.info(f"Unable to send pulsar message. Retrying attempt {retries}")
-            send_pulsar_message(output_data, pulsar_client, retries + 1)
-        else:
-            logging.info("Unable to send pulsar message. Maximum retries reached")
-            logging.exception(e)
+    upload_file_s3(json.dumps(latest_harvested), s3_bucket, metadata_s3_key, s3_client)
 
 
 def compare_to_previous_version(
@@ -351,16 +318,6 @@ def get_file_hash(data: str) -> str:
     return _md5_hash(data.encode("utf-8"))
 
 
-def get_file_s3(bucket: str, key: str, s3_client: boto3.client) -> str:
-    """Retrieve data from an S3 bucket"""
-    try:
-        file_obj = s3_client.get_object(Bucket=bucket, Key=key)
-        return file_obj["Body"].read().decode("utf-8")
-    except ClientError as e:
-        logging.warning(f"File retrieval failed for {key}: {e}")
-        return None
-
-
 def get_metadata(bucket: str, key: str, s3_client: boto3.client) -> dict:
     """Read file at given S3 location and parse as JSON"""
     previously_harvested = get_file_s3(bucket, key, s3_client)
@@ -454,7 +411,7 @@ def modify_value(key, value) -> str:
     return value
 
 
-def generate_stac_item(data: dict, config: dict) -> str:
+def generate_stac_item(data: dict, config: dict) -> dict:
     """Catalogue items for Airbus data"""
     coordinates = data["geometry"]["coordinates"][0]
     bbox = coordinates_to_bbox(coordinates)
@@ -492,10 +449,10 @@ def generate_stac_item(data: dict, config: dict) -> str:
         "assets": assets,
     }
 
-    return json.dumps(stac_item, indent=4)
+    return stac_item
 
 
-def make_catalogue() -> str:
+def make_catalogue() -> dict:
     """Top level catalogue for Airbus data"""
     stac_catalog = {
         "type": "Catalog",
@@ -504,7 +461,7 @@ def make_catalogue() -> str:
         "description": "Airbus Datasets",
         "links": [],
     }
-    return json.dumps(stac_catalog, indent=4)
+    return stac_catalog
 
 
 if __name__ == "__main__":
