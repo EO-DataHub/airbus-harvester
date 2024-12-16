@@ -351,7 +351,7 @@ def get_stac_collection_summary(all_data: dict) -> dict:
     }
 
 
-def generate_stac_collection(all_data_summary: dict, config: dict) -> str:
+def generate_stac_collection(all_data_summary: dict, config: dict) -> dict:
     """Top level collection for Airbus data"""
 
     stac_template = load_config(f"airbus_harvester/{config['collection_name']}.json")
@@ -360,7 +360,7 @@ def generate_stac_collection(all_data_summary: dict, config: dict) -> str:
         "spatial": {"bbox": [all_data_summary["bbox"]]},
         "temporal": {"interval": [[all_data_summary["start_time"], all_data_summary["stop_time"]]]},
     }
-    return json.dumps(stac_template, indent=4)
+    return stac_template
 
 
 def handle_external_url(
