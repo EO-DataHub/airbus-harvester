@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 import os
+import uuid
 from json import JSONDecodeError
 from typing import Optional
 
@@ -64,7 +65,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     pulsar_client = get_pulsar_client()
     producer = pulsar_client.create_producer(
         topic=f"harvested{identifier}",
-        producer_name=f"stac_harvester/airbus/{config['collection_name']}",
+        producer_name=f"stac_harvester/airbus/{config['collection_name']}_{uuid.uuid1().hex}",
         chunking_enabled=True,
     )
 
