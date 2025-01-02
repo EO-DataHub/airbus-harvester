@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 import os
+import time
 import uuid
 from json import JSONDecodeError
 
@@ -303,6 +304,8 @@ def get_next_page(url: str, config: dict, retry_count: int = 0) -> dict:
         logging.warning(f"Retrying retrieval of {url}. Attempt {retry_count}")
         if retry_count > 3:
             raise
+
+        time.sleep(2**retry_count)
 
         return get_next_page(url, config, retry_count=retry_count + 1)
 
