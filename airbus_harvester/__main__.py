@@ -116,7 +116,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
         for entry in body["features"]:
             data = generate_stac_item(entry, config)
-            logging.error(data["properties"][config["item_id_key"]])
+            logging.error(entry.get("properties", []).get(config["item_id_key"]))
             try:
                 file_name = f"{entry['properties'][config['item_id_key']]}.json"
                 key = f"{key_root}/{config['collection_name']}/{file_name}"
