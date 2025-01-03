@@ -158,7 +158,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                 # The counter can only go up to 50. Limit the search by last update date
                 if (url_count + 1) % 50 == 0:
                     logging.error("444444444444444444")
-                    latest_read_date = datetime.strptime(
+                    latest_read_date = datetime.datetime.strptime(
                         entry["properties"]["lastUpdateDate"], "%Y-%m-%dT%H:%M:%SZ"
                     )
                     five_days_ago = datetime.datetime.now() - datetime.timedelta(days=5)
