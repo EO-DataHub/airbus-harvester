@@ -159,8 +159,10 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                 if (url_count + 1) % 50 == 0:
                     logging.error("444444444444444444")
                     test_date = entry["properties"]["lastUpdateDate"]
-                    test_date = test_date[:26]
-                    latest_read_date = datetime.datetime.strptime(test_date, "%Y-%m-%dT%H:%M:%SZ")
+                    test_date = test_date[:26] + "Z"
+                    latest_read_date = datetime.datetime.strptime(
+                        test_date, "%Y-%m-%dT%H:%M:%S.%fZ"
+                    )
                     five_days_ago = datetime.datetime.now() - datetime.timedelta(days=5)
                     config["body"][
                         "lastUpdateDate"
