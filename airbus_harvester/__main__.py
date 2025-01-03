@@ -109,10 +109,14 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     while next_url:
         url_count += 1
 
+        logging.error("XXXXXXXXXXXXXXXXXXXXXXXXX")
         body = get_next_page(next_url, config)
+
+        logging.error(len(body["features"]))
 
         for entry in body["features"]:
             data = generate_stac_item(entry, config)
+            logging.error(data["properties"][config["item_id_key"]])
             try:
                 file_name = f"{entry['properties'][config['item_id_key']]}.json"
                 key = f"{key_root}/{config['collection_name']}/{file_name}"
@@ -132,6 +136,8 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
             catalogue_data_summary = add_to_catalogue_data_summary(catalogue_data_summary, data)
 
+        logging.error("0000000000000000000")
+
         catalogue_data_summary = simplify_catalogue_data_summary(catalogue_data_summary)
 
         if config["pagination_method"] == "link":
@@ -141,15 +147,22 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                 logging.error(e)
                 raise
         elif config["pagination_method"] == "counter":
+            logging.error("1111111111111111111111")
             if not body["features"]:
                 next_url = None
+
+                logging.error("22222222222222")
             else:
+                logging.error("333333333333333333333")
                 # The counter can only go up to 50. Limit the search by last update date
                 if (url_count + 1) % 50 == 0:
+                    logging.error("444444444444444444")
                     config["body"][
                         "lastUpdateDate"
                     ] = f"[2018-10-03T12:00:00Z,{entry['properties']['lastUpdateDate']}]"
                 config["body"]["startPage"] = (url_count % 50) + 1
+                logging.error("5555555555555555555555")
+                logging.error(config["body"])
 
         logging.error(f"Page {url_count} next URL: {next_url}")
 
@@ -178,7 +191,9 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                 "deleted_keys": [],
             }
             airbus_harvester_messager.consume(msg)
+            logging.error("Uploading metadata file")
             upload_file_s3(json.dumps(latest_harvested), s3_bucket, metadata_s3_key, s3_client)
+            logging.error("Metadata file uploaded")
             harvested_data = {}
 
     # Do not updated collection
@@ -194,7 +209,9 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     msg = {"harvested_data": harvested_data, "deleted_keys": deleted_keys}
     airbus_harvester_messager.consume(msg)
 
+    logging.error("Uploading metadata file")
     upload_file_s3(json.dumps(latest_harvested), s3_bucket, metadata_s3_key, s3_client)
+    logging.error("Metadata file uploaded")
 
 
 def compare_to_previous_version(
