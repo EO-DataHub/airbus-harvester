@@ -1,3 +1,4 @@
+import datetime
 import hashlib
 import json
 import logging
@@ -157,9 +158,14 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                 # The counter can only go up to 50. Limit the search by last update date
                 if (url_count + 1) % 50 == 0:
                     logging.error("444444444444444444")
+                    latest_read_date = datetime.strptime(
+                        entry["properties"]["lastUpdateDate"], "%Y-%m-%dT%H:%M:%SZ"
+                    )
+                    five_days_ago = datetime.datetime.now() - datetime.timedelta(days=5)
                     config["body"][
                         "lastUpdateDate"
-                    ] = f"[2018-10-03T12:00:00Z,{entry['properties']['lastUpdateDate']}]"
+                    ] = f"[2018-10-03T12:00:00Z, {min(latest_read_date, five_days_ago)}]"
+                    # ] = f"[2018-10-03T12:00:00Z, {min(entry['properties']['lastUpdateDate'], )}]"
                 config["body"]["startPage"] = (url_count % 50) + 1
                 logging.error("5555555555555555555555")
                 logging.error(config["body"])
