@@ -164,9 +164,13 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                         test_date, "%Y-%m-%dT%H:%M:%S.%fZ"
                     )
                     five_days_ago = datetime.datetime.now() - datetime.timedelta(days=5)
+                    five_days_ago = datetime.datetime.strftime(
+                        five_days_ago, "%Y-%m-%dT%H:%M:%S.%fZ"
+                    )
                     five_days_ago = datetime.datetime.strptime(
                         five_days_ago, "%Y-%m-%dT%H:%M:%S.%fZ"
                     )
+                    print(test_date, five_days_ago)
                     config["body"][
                         "lastUpdateDate"
                     ] = f"[2018-10-03T12:00:00Z, {min(latest_read_date, five_days_ago)}]"
