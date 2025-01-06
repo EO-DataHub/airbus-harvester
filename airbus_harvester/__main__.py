@@ -165,7 +165,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                     )
                     five_days_ago = datetime.datetime.now() - datetime.timedelta(days=5)
                     # five_days_ago = five_days_ago.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-                    logging.error(f"{test_date} {five_days_ago}")
+                    logging.error(f"Compare: {test_date} {five_days_ago}")
 
                     my_date = min(latest_read_date, five_days_ago)
                     config["body"][
