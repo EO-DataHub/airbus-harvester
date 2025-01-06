@@ -165,6 +165,9 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                     )
                     five_days_ago = datetime.datetime.now() - datetime.timedelta(days=5)
                     five_days_ago = five_days_ago.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+                    five_days_ago = datetime.datetime.strptime(
+                        five_days_ago, "%Y-%m-%dT%H:%M:%S.%fZ"
+                    )
                     logging.error(f"{test_date} {five_days_ago}")
                     config["body"][
                         "lastUpdateDate"
