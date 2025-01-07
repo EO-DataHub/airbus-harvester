@@ -436,7 +436,7 @@ def generate_stac_item(data: dict, config: dict) -> dict:
     bbox = coordinates_to_bbox(coordinates)
 
     mapped_keys = set()
-    properties = config["stac_properties"]
+    properties = config["stac_properties"].copy()
 
     links = []
     assets = {}
