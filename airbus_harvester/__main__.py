@@ -294,8 +294,10 @@ def generate_access_token(env: str = "dev") -> str:
         ("grant_type", "api_key"),
         ("client_id", "IDP"),
     ]
+    logging.error("qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq")
 
     response = requests.post(url, headers=headers, data=data)
+    logging.error("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww")
 
     return response.json().get("access_token")
 
@@ -310,21 +312,29 @@ def get_next_page(url: str, config: dict, retry_count: int = 0) -> dict:
             headers["Authorization"] = "Bearer " + access_token
 
         if config["request_method"].upper() == "POST":
+            logging.error("eeeeeeeeeeeeeeee")
             response = requests.post(url, json=config["body"], headers=headers)
+            logging.error("rrrrrrrrrrrrrrrrrrrrrrrr")
         else:
+            logging.error("ttttttttttttttttttt")
             response = requests.get(url, json=config["body"], headers=headers)
+            logging.error("yyyyyyyyyyyyyyyyyyyyyyyyyy")
         response.raise_for_status()
 
         return response.json()
 
     except (JSONDecodeError, requests.exceptions.HTTPError):
-        logging.warning(f"Retrying retrieval of {url}. Attempt {retry_count}")
+        logging.error(f"Retrying retrieval of {url}. Attempt {retry_count}")
         if retry_count > 3:
             raise
 
         time.sleep(2**retry_count)
 
         return get_next_page(url, config, retry_count=retry_count + 1)
+
+    except Exception as e:
+        logging.error("uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu")
+        logging.error(e)
 
 
 def get_file_hash(data: str) -> str:
