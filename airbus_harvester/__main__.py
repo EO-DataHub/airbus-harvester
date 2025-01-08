@@ -2,7 +2,11 @@ import hashlib
 import json
 import logging
 import os
+import time
+import traceback
+import uuid
 from json import JSONDecodeError
+from typing import Optional
 
 import boto3
 import click
@@ -20,6 +24,7 @@ logging.basicConfig(
 )
 
 minimum_message_entries = int(os.environ.get("MINIMUM_MESSAGE_ENTRIES", 100))
+proxy_base_url = os.environ.get("PROXY_BASE_URL", "")
 
 
 def load_config(config_path):
@@ -57,7 +62,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     pulsar_client = get_pulsar_client()
     producer = pulsar_client.create_producer(
         topic="harvested",
-        producer_name=f"stac_harvester/airbus/{config['collection_name']}",
+        producer_name=f"stac_harvester/airbus/{config['collection_name']}_{uuid.uuid1().hex}",
         chunking_enabled=True,
     )
 
@@ -107,10 +112,14 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     while next_url:
         url_count += 1
 
+        logging.error("XXXXXXXXXXXXXXXXXXXXXXXXX")
         body = get_next_page(next_url, config)
+
+        logging.error(len(body["features"]))
 
         for entry in body["features"]:
             data = generate_stac_item(entry, config)
+            logging.error(entry.get("properties", []).get(config["item_id_key"]))
             try:
                 file_name = f"{entry['properties'][config['item_id_key']]}.json"
                 key = f"{key_root}/{config['collection_name']}/{file_name}"
@@ -130,6 +139,8 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
             catalogue_data_summary = add_to_catalogue_data_summary(catalogue_data_summary, data)
 
+        logging.error("0000000000000000000")
+
         catalogue_data_summary = simplify_catalogue_data_summary(catalogue_data_summary)
 
         if config["pagination_method"] == "link":
@@ -139,15 +150,22 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                 logging.error(e)
                 raise
         elif config["pagination_method"] == "counter":
+            logging.error("1111111111111111111111")
             if not body["features"]:
                 next_url = None
+
+                logging.error("22222222222222")
             else:
+                logging.error("333333333333333333333")
                 # The counter can only go up to 50. Limit the search by last update date
                 if (url_count + 1) % 50 == 0:
+                    logging.error("444444444444444444")
                     config["body"][
                         "lastUpdateDate"
                     ] = f"[2018-10-03T12:00:00Z,{entry['properties']['lastUpdateDate']}]"
                 config["body"]["startPage"] = (url_count % 50) + 1
+                logging.error("5555555555555555555555")
+                logging.error(config["body"])
 
         logging.error(f"Page {url_count} next URL: {next_url}")
 
@@ -176,7 +194,9 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                 "deleted_keys": [],
             }
             airbus_harvester_messager.consume(msg)
+            logging.error("Uploading metadata file")
             upload_file_s3(json.dumps(latest_harvested), s3_bucket, metadata_s3_key, s3_client)
+            logging.error("Metadata file uploaded")
             harvested_data = {}
 
     # Do not updated collection
@@ -192,7 +212,9 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     msg = {"harvested_data": harvested_data, "deleted_keys": deleted_keys}
     airbus_harvester_messager.consume(msg)
 
+    logging.error("Uploading metadata file")
     upload_file_s3(json.dumps(latest_harvested), s3_bucket, metadata_s3_key, s3_client)
+    logging.error("Metadata file uploaded")
 
 
 def compare_to_previous_version(
@@ -275,8 +297,10 @@ def generate_access_token(env: str = "dev") -> str:
         ("grant_type", "api_key"),
         ("client_id", "IDP"),
     ]
+    logging.error("qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq")
 
-    response = requests.post(url, headers=headers, data=data)
+    response = requests.post(url, headers=headers, data=data, timeout=10)
+    logging.error("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww")
 
     return response.json().get("access_token")
 
@@ -291,19 +315,32 @@ def get_next_page(url: str, config: dict, retry_count: int = 0) -> dict:
             headers["Authorization"] = "Bearer " + access_token
 
         if config["request_method"].upper() == "POST":
-            response = requests.post(url, json=config["body"], headers=headers)
+            logging.error("eeeeeeeeeeeeeeee")
+            response = requests.post(url, json=config["body"], headers=headers, timeout=10)
+            logging.error("rrrrrrrrrrrrrrrrrrrrrrrr")
         else:
-            response = requests.get(url, json=config["body"], headers=headers)
+            logging.error("ttttttttttttttttttt")
+            response = requests.get(url, json=config["body"], headers=headers, timeout=10)
+            logging.error("yyyyyyyyyyyyyyyyyyyyyyyyyy")
         response.raise_for_status()
 
         return response.json()
 
-    except (JSONDecodeError, requests.exceptions.HTTPError):
-        logging.warning(f"Retrying retrieval of {url}. Attempt {retry_count}")
+    except (JSONDecodeError, requests.exceptions.HTTPError, requests.exceptions.Timeout) as e:
+        logging.error(e)
+        logging.error(traceback.format_exc())
+        logging.error(f"Retrying retrieval of {url}. Attempt {retry_count}")
         if retry_count > 3:
             raise
 
+        time.sleep(2**retry_count)
+
         return get_next_page(url, config, retry_count=retry_count + 1)
+
+    except Exception as e:
+        logging.error("uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu")
+        logging.error(e)
+        logging.error(traceback.format_exc())
 
 
 def get_file_hash(data: str) -> str:
@@ -364,7 +401,13 @@ def generate_stac_collection(all_data_summary: dict, config: dict) -> dict:
 
 
 def handle_external_url(
-    data: dict, links: list, assets: dict, mapped_keys: set, name: str, path: str
+    data: dict,
+    links: list,
+    assets: dict,
+    mapped_keys: set,
+    name: str,
+    path: str,
+    proxy: Optional[str] = None,
 ):
     """Convert external URL to link and asset"""
     mime_types = {
@@ -386,17 +429,17 @@ def handle_external_url(
     if external_url:
         file_extension = os.path.splitext(external_url)[1].lower()
         mime_type = mime_types.get(file_extension, "application/octet-stream")
-        links.append(
-            {
-                "rel": name,
-                "href": external_url,
-                "type": mime_type,
-            }
-        )
-        assets[name] = {
-            "href": external_url,
-            "type": mime_type,
-        }
+
+        def add_link_and_asset(rel_name, href):
+            links.append({"rel": rel_name, "href": href, "type": mime_type})
+            assets[rel_name] = {"href": href, "type": mime_type}
+
+        if proxy:
+            proxy_url = f"{proxy}/{name}"
+            add_link_and_asset(f"external_{name}", external_url)
+            add_link_and_asset(name, proxy_url)
+        else:
+            add_link_and_asset(name, external_url)
         mapped_keys.add(key)
 
 
@@ -413,11 +456,13 @@ def modify_value(key, value) -> str:
 
 def generate_stac_item(data: dict, config: dict) -> dict:
     """Catalogue items for Airbus data"""
+    item_id = data["properties"][config["item_id_key"]]
+
     coordinates = data["geometry"]["coordinates"][0]
     bbox = coordinates_to_bbox(coordinates)
 
     mapped_keys = set()
-    properties = config["stac_properties"]
+    properties = config["stac_properties"].copy()
 
     links = []
     assets = {}
@@ -428,8 +473,14 @@ def generate_stac_item(data: dict, config: dict) -> dict:
             mapped_keys.add(airbus_key)
 
     for url_config in config["external_urls"]:
+        proxy_url = None
+        if url_config.get("proxy", False):
+            proxy_url = (
+                f"{proxy_base_url}/api/catalogue/stac/catalogs/supported-datasets/airbus/"
+                f"collections/{config['collection_name']}/items/{item_id}"
+            )
         handle_external_url(
-            data, links, assets, mapped_keys, url_config["name"], url_config["path"]
+            data, links, assets, mapped_keys, url_config["name"], url_config["path"], proxy_url
         )
 
     for key, value in data["properties"].items():
@@ -440,7 +491,7 @@ def generate_stac_item(data: dict, config: dict) -> dict:
         "type": "Feature",
         "stac_version": "1.0.0",
         "stac_extensions": config["stac_extensions"],
-        "id": data["properties"][config["item_id_key"]],
+        "id": item_id,
         "collection": config["collection_name"],
         "geometry": {"type": "Polygon", "coordinates": [coordinates]},
         "bbox": bbox,
