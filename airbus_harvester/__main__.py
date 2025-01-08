@@ -324,7 +324,9 @@ def get_next_page(url: str, config: dict, retry_count: int = 0) -> dict:
 
         return response.json()
 
-    except (JSONDecodeError, requests.exceptions.HTTPError, requests.exceptions.Timeout):
+    except (JSONDecodeError, requests.exceptions.HTTPError, requests.exceptions.Timeout) as e:
+        logging.error(e)
+        logging.error(traceback.format_exc())
         logging.error(f"Retrying retrieval of {url}. Attempt {retry_count}")
         if retry_count > 3:
             raise
