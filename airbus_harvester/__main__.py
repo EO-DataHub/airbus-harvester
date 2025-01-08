@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import time
+import traceback
 import uuid
 from json import JSONDecodeError
 
@@ -296,7 +297,7 @@ def generate_access_token(env: str = "dev") -> str:
     ]
     logging.error("qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq")
 
-    response = requests.post(url, headers=headers, data=data)
+    response = requests.post(url, headers=headers, data=data, timeout=10)
     logging.error("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww")
 
     return response.json().get("access_token")
@@ -313,17 +314,17 @@ def get_next_page(url: str, config: dict, retry_count: int = 0) -> dict:
 
         if config["request_method"].upper() == "POST":
             logging.error("eeeeeeeeeeeeeeee")
-            response = requests.post(url, json=config["body"], headers=headers)
+            response = requests.post(url, json=config["body"], headers=headers, timeout=10)
             logging.error("rrrrrrrrrrrrrrrrrrrrrrrr")
         else:
             logging.error("ttttttttttttttttttt")
-            response = requests.get(url, json=config["body"], headers=headers)
+            response = requests.get(url, json=config["body"], headers=headers, timeout=10)
             logging.error("yyyyyyyyyyyyyyyyyyyyyyyyyy")
         response.raise_for_status()
 
         return response.json()
 
-    except (JSONDecodeError, requests.exceptions.HTTPError):
+    except (JSONDecodeError, requests.exceptions.HTTPError, requests.exceptions.Timeout):
         logging.error(f"Retrying retrieval of {url}. Attempt {retry_count}")
         if retry_count > 3:
             raise
@@ -335,6 +336,7 @@ def get_next_page(url: str, config: dict, retry_count: int = 0) -> dict:
     except Exception as e:
         logging.error("uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu")
         logging.error(e)
+        logging.error(traceback.format_exc())
 
 
 def get_file_hash(data: str) -> str:
