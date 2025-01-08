@@ -6,6 +6,7 @@ import time
 import traceback
 import uuid
 from json import JSONDecodeError
+from typing import Optional
 
 import boto3
 import click
@@ -23,6 +24,7 @@ logging.basicConfig(
 )
 
 minimum_message_entries = int(os.environ.get("MINIMUM_MESSAGE_ENTRIES", 100))
+proxy_base_url = os.environ.get("PROXY_BASE_URL", "")
 
 
 def load_config(config_path):
@@ -399,7 +401,13 @@ def generate_stac_collection(all_data_summary: dict, config: dict) -> dict:
 
 
 def handle_external_url(
-    data: dict, links: list, assets: dict, mapped_keys: set, name: str, path: str
+    data: dict,
+    links: list,
+    assets: dict,
+    mapped_keys: set,
+    name: str,
+    path: str,
+    proxy: Optional[str] = None,
 ):
     """Convert external URL to link and asset"""
     mime_types = {
@@ -421,17 +429,17 @@ def handle_external_url(
     if external_url:
         file_extension = os.path.splitext(external_url)[1].lower()
         mime_type = mime_types.get(file_extension, "application/octet-stream")
-        links.append(
-            {
-                "rel": name,
-                "href": external_url,
-                "type": mime_type,
-            }
-        )
-        assets[name] = {
-            "href": external_url,
-            "type": mime_type,
-        }
+
+        def add_link_and_asset(rel_name, href):
+            links.append({"rel": rel_name, "href": href, "type": mime_type})
+            assets[rel_name] = {"href": href, "type": mime_type}
+
+        if proxy:
+            proxy_url = f"{proxy}/{name}"
+            add_link_and_asset(f"external_{name}", external_url)
+            add_link_and_asset(name, proxy_url)
+        else:
+            add_link_and_asset(name, external_url)
         mapped_keys.add(key)
 
 
@@ -448,6 +456,8 @@ def modify_value(key, value) -> str:
 
 def generate_stac_item(data: dict, config: dict) -> dict:
     """Catalogue items for Airbus data"""
+    item_id = data["properties"][config["item_id_key"]]
+
     coordinates = data["geometry"]["coordinates"][0]
     bbox = coordinates_to_bbox(coordinates)
 
@@ -463,8 +473,14 @@ def generate_stac_item(data: dict, config: dict) -> dict:
             mapped_keys.add(airbus_key)
 
     for url_config in config["external_urls"]:
+        proxy_url = None
+        if url_config.get("proxy", False):
+            proxy_url = (
+                f"{proxy_base_url}/api/catalogue/stac/catalogs/supported-datasets/airbus/"
+                f"collections/{config['collection_name']}/items/{item_id}"
+            )
         handle_external_url(
-            data, links, assets, mapped_keys, url_config["name"], url_config["path"]
+            data, links, assets, mapped_keys, url_config["name"], url_config["path"], proxy_url
         )
 
     for key, value in data["properties"].items():
@@ -475,7 +491,7 @@ def generate_stac_item(data: dict, config: dict) -> dict:
         "type": "Feature",
         "stac_version": "1.0.0",
         "stac_extensions": config["stac_extensions"],
-        "id": data["properties"][config["item_id_key"]],
+        "id": item_id,
         "collection": config["collection_name"],
         "geometry": {"type": "Polygon", "coordinates": [coordinates]},
         "bbox": bbox,

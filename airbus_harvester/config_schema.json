@@ -49,6 +49,10 @@
                     "path": {
                         "type": "string",
                         "description": "Path to the external URL in the API response."
+                    },
+                    "proxy": {
+                        "type": ["boolean", "null"],
+                        "description": "Whether to proxy the external URL through the EODH API."
                     }
                 }
             }
