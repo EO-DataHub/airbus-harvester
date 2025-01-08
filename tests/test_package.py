@@ -21,7 +21,7 @@ from airbus_harvester.__main__ import (
     modify_value,
 )
 
-
+# this is a comment
 @pytest.fixture(autouse=True)
 def setenvvar(monkeypatch):
     with mock.patch.dict(os.environ, clear=True):
