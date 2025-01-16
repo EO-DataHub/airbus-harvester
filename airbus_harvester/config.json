@@ -171,11 +171,13 @@
         "external_urls": [
             {
                 "name": "quicklook",
-                "path": "_links.quicklook.href"
+                "path": "_links.quicklook.href",
+                "proxy": true
             },
             {
                 "name": "thumbnail",
-                "path": "_links.thumbnail.href"
+                "path": "_links.thumbnail.href",
+                "proxy": true
             }
         ],
         "stac_extensions": [
