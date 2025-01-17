@@ -56,9 +56,14 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     config_key = os.getenv("HARVESTER_CONFIG_KEY", "")
     config = load_config("airbus_harvester/config.json").get(config_key.upper())
 
+    if os.getenv("TOPIC"):
+        identifier = "_" + os.getenv("TOPIC")
+    else:
+        identifier = ""
+
     pulsar_client = get_pulsar_client()
     producer = pulsar_client.create_producer(
-        topic="harvested",
+        topic=f"harvested{identifier}",
         producer_name=f"stac_harvester/airbus/{config['collection_name']}",
         chunking_enabled=True,
     )
