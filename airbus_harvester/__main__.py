@@ -118,8 +118,10 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         url_count += 1
 
         body = get_next_page(next_url, config)
+        features = body.get("features", [])
+        logging.error(f"Page {url_count} features: {len(features)}")
 
-        for entry in body["features"]:
+        for entry in features:
             data = generate_stac_item(entry, config)
             try:
                 file_name = f"{entry['properties'][config['item_id_key']]}.json"
@@ -149,7 +151,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                 logging.error(e)
                 raise
         elif config["pagination_method"] == "counter":
-            if not body["features"]:
+            if not features:
                 next_url = None
             else:
                 # The counter can only go up to 50. Limit the search by last update date
@@ -185,8 +187,11 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                 "harvested_data": harvested_data,
                 "deleted_keys": [],
             }
+            logging.error(f"Sending message with {len(harvested_data.keys())} entries")
             airbus_harvester_messager.consume(msg)
+            logging.error("Uploading metadata to S3")
             upload_file_s3(json.dumps(latest_harvested), s3_bucket, metadata_s3_key, s3_client)
+            logging.error("Uploaded metadata to S3")
             harvested_data = {}
 
     # Do not updated collection
@@ -200,9 +205,14 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
     # Send message for altered keys
     msg = {"harvested_data": harvested_data, "deleted_keys": deleted_keys}
+    logging.error(
+        f"Sending message with {len(harvested_data.keys())} entries and {len(deleted_keys)} deleted keys"
+    )
     airbus_harvester_messager.consume(msg)
 
+    logging.error("Uploading metadata to S3")
     upload_file_s3(json.dumps(latest_harvested), s3_bucket, metadata_s3_key, s3_client)
+    logging.error("Uploaded metadata to S3")
 
 
 def compare_to_previous_version(
@@ -285,8 +295,9 @@ def generate_access_token(env: str = "dev") -> str:
         ("grant_type", "api_key"),
         ("client_id", "IDP"),
     ]
-
+    logging.error(f"Making POST request to {url} for access token")
     response = requests.post(url, headers=headers, data=data, timeout=10)
+    logging.error(f"Response status code: {response.status_code}")
 
     return response.json().get("access_token")
 
@@ -300,10 +311,14 @@ def get_next_page(url: str, config: dict, retry_count: int = 0) -> dict:
             access_token = generate_access_token(config["auth_env"])
             headers["Authorization"] = "Bearer " + access_token
 
+        logging.error(
+            f"Making {config['request_method'].upper()} request to {url} with body {config['body']}"
+        )
         if config["request_method"].upper() == "POST":
             response = requests.post(url, json=config["body"], headers=headers, timeout=10)
         else:
             response = requests.get(url, json=config["body"], headers=headers, timeout=10)
+        logging.error(f"Response status code: {response.status_code}")
         response.raise_for_status()
 
         return response.json()
@@ -434,6 +449,7 @@ def modify_value(key, value) -> str:
 def generate_stac_item(data: dict, config: dict) -> dict:
     """Catalogue items for Airbus data"""
     item_id = data["properties"][config["item_id_key"]]
+    logging.error(f"Processing item {item_id}")
 
     coordinates = data["geometry"]["coordinates"][0]
     bbox = coordinates_to_bbox(coordinates)
