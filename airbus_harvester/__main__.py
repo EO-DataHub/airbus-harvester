@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import time
+import traceback
 import uuid
 from json import JSONDecodeError
 from typing import Optional
@@ -285,7 +286,7 @@ def generate_access_token(env: str = "dev") -> str:
         ("client_id", "IDP"),
     ]
 
-    response = requests.post(url, headers=headers, data=data)
+    response = requests.post(url, headers=headers, data=data, timeout=10)
 
     return response.json().get("access_token")
 
@@ -300,15 +301,17 @@ def get_next_page(url: str, config: dict, retry_count: int = 0) -> dict:
             headers["Authorization"] = "Bearer " + access_token
 
         if config["request_method"].upper() == "POST":
-            response = requests.post(url, json=config["body"], headers=headers)
+            response = requests.post(url, json=config["body"], headers=headers, timeout=10)
         else:
-            response = requests.get(url, json=config["body"], headers=headers)
+            response = requests.get(url, json=config["body"], headers=headers, timeout=10)
         response.raise_for_status()
 
         return response.json()
 
-    except (JSONDecodeError, requests.exceptions.HTTPError):
-        logging.warning(f"Retrying retrieval of {url}. Attempt {retry_count}")
+    except (JSONDecodeError, requests.exceptions.HTTPError, requests.exceptions.Timeout) as e:
+        logging.error(e)
+        logging.error(traceback.format_exc())
+        logging.error(f"Retrying retrieval of {url}. Attempt {retry_count}")
         if retry_count > 3:
             raise
 
