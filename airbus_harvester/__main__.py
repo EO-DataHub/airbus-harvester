@@ -14,6 +14,7 @@ import requests
 from eodhp_utils.aws.s3 import get_file_s3, upload_file_s3
 from eodhp_utils.runner import get_boto3_session, get_pulsar_client, setup_logging
 from inflection import underscore
+from requests.exceptions import ConnectionError, HTTPError, Timeout
 
 from airbus_harvester.airbus_harvester_messager import AirbusHarvesterMessager
 
@@ -277,7 +278,7 @@ def simplify_catalogue_data_summary(all_data: dict) -> dict:
     }
 
 
-def generate_access_token(env: str = "dev") -> str:
+def generate_access_token(env: str = "dev", retry_count: int = 0) -> str:
     """Generate access token for Airbus API"""
     if env == "prod":
         url = "https://authenticate.foundation.api.oneatlas.airbus.com/auth/realms/IDP/protocol/openid-connect/token"
@@ -295,11 +296,29 @@ def generate_access_token(env: str = "dev") -> str:
         ("grant_type", "api_key"),
         ("client_id", "IDP"),
     ]
-    logging.error(f"Making POST request to {url} for access token")
-    response = requests.post(url, headers=headers, data=data, timeout=10)
-    logging.error(f"Response status code: {response.status_code}")
 
-    return response.json().get("access_token")
+    try:
+        logging.error(f"Making POST request to {url} for access token")
+        response = requests.post(url, headers=headers, data=data, timeout=10)
+        logging.error(f"Response status code: {response.status_code}")
+        response.raise_for_status()
+        access_token = response.json().get("access_token")
+
+        if access_token:
+            return access_token
+        else:
+            raise ValueError("Access token is None")
+
+    except (ConnectionError, HTTPError, Timeout, ValueError) as e:
+        logging.error(e)
+        logging.error(traceback.format_exc())
+        if retry_count >= 3:
+            logging.error(f"Failed to generate access token after {retry_count + 1} attempts.")
+            raise
+
+        logging.error(f"Retrying access token generation. Attempt {retry_count + 1}")
+        time.sleep(2**retry_count)
+        return generate_access_token(env, retry_count=retry_count + 1)
 
 
 def get_next_page(url: str, config: dict, retry_count: int = 0) -> dict:
@@ -323,15 +342,15 @@ def get_next_page(url: str, config: dict, retry_count: int = 0) -> dict:
 
         return response.json()
 
-    except (JSONDecodeError, requests.exceptions.HTTPError, requests.exceptions.Timeout) as e:
+    except (JSONDecodeError, ConnectionError, HTTPError, Timeout) as e:
         logging.error(e)
         logging.error(traceback.format_exc())
-        logging.error(f"Retrying retrieval of {url}. Attempt {retry_count}")
         if retry_count > 3:
+            logging.error(f"Failed to obtain valid response after {retry_count + 1} attempts.")
             raise
 
+        logging.error(f"Retrying retrieval of {url}. Attempt {retry_count + 1}")
         time.sleep(2**retry_count)
-
         return get_next_page(url, config, retry_count=retry_count + 1)
 
 
