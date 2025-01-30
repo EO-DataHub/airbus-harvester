@@ -14,6 +14,7 @@ import requests
 from eodhp_utils.aws.s3 import get_file_s3, upload_file_s3
 from eodhp_utils.runner import get_boto3_session, get_pulsar_client, setup_logging
 from inflection import underscore
+from pulsar import ConnectError
 from requests.exceptions import ConnectionError, HTTPError, Timeout
 
 from airbus_harvester.airbus_harvester_messager import AirbusHarvesterMessager
@@ -65,12 +66,27 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     else:
         identifier = ""
 
-    pulsar_client = get_pulsar_client()
-    producer = pulsar_client.create_producer(
-        topic=f"harvested{identifier}",
-        producer_name=f"stac_harvester/airbus/{config['collection_name']}_{uuid.uuid1().hex}",
-        chunking_enabled=True,
-    )
+    def get_pulsar_producer(retry_count: int = 0):
+        """Initialise pulsar producer. Retry if connection fails"""
+        try:
+            pulsar_client = get_pulsar_client()
+            producer = pulsar_client.create_producer(
+                topic=f"harvested{identifier}",
+                producer_name=f"stac_harvester/airbus/{config['collection_name']}_{uuid.uuid1().hex}",
+                chunking_enabled=True,
+            )
+            return producer
+        except ConnectError as e:
+            logging.error(f"Failed to connect to pulsar: {e}")
+            if retry_count >= 10:
+                logging.error(f"Failed to connect to pulsar after {retry_count + 1} attempts.")
+                raise
+
+            logging.error(f"Retrying pulsar initialisation. Attempt {retry_count + 1}")
+            time.sleep(2**retry_count)
+            return get_pulsar_producer(retry_count=retry_count + 1)
+
+    producer = get_pulsar_producer()
 
     if not config:
         logging.error(f"Configuration key {config_key} not found in config file.")
