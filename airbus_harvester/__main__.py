@@ -361,12 +361,12 @@ def get_next_page(url: str, config: dict, retry_count: int = 0) -> dict:
     except (JSONDecodeError, ConnectionError, HTTPError, Timeout) as e:
         logging.error(e)
         logging.error(traceback.format_exc())
-        if retry_count > 3:
+        if retry_count > 5:
             logging.error(f"Failed to obtain valid response after {retry_count + 1} attempts.")
             raise
 
         logging.error(f"Retrying retrieval of {url}. Attempt {retry_count + 1}")
-        time.sleep(2**retry_count)
+        time.sleep(5**retry_count)
         return get_next_page(url, config, retry_count=retry_count + 1)
 
 
