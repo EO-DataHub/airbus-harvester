@@ -2,6 +2,9 @@ import hashlib
 import json
 import logging
 import os
+import time
+import traceback
+import uuid
 from json import JSONDecodeError
 from typing import Optional
 
@@ -11,6 +14,8 @@ import requests
 from eodhp_utils.aws.s3 import get_file_s3, upload_file_s3
 from eodhp_utils.runner import get_boto3_session, get_pulsar_client, setup_logging
 from inflection import underscore
+from pulsar import ConnectError
+from requests.exceptions import ConnectionError, HTTPError, Timeout
 
 from airbus_harvester.airbus_harvester_messager import AirbusHarvesterMessager
 
@@ -22,6 +27,7 @@ logging.basicConfig(
 
 minimum_message_entries = int(os.environ.get("MINIMUM_MESSAGE_ENTRIES", 100))
 proxy_base_url = os.environ.get("PROXY_BASE_URL", "")
+max_api_retries = int(os.environ.get("MAX_API_RETRIES", 5))
 
 
 def load_config(config_path):
@@ -61,12 +67,27 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     else:
         identifier = ""
 
-    pulsar_client = get_pulsar_client()
-    producer = pulsar_client.create_producer(
-        topic=f"harvested{identifier}",
-        producer_name=f"stac_harvester/airbus/{config['collection_name']}",
-        chunking_enabled=True,
-    )
+    def get_pulsar_producer(retry_count: int = 0):
+        """Initialise pulsar producer. Retry if connection fails"""
+        try:
+            pulsar_client = get_pulsar_client()
+            producer = pulsar_client.create_producer(
+                topic=f"harvested{identifier}",
+                producer_name=f"stac_harvester/airbus/{config['collection_name']}_{uuid.uuid1().hex}",
+                chunking_enabled=True,
+            )
+            return producer
+        except ConnectError as e:
+            logging.error(f"Failed to connect to pulsar: {e}")
+            if retry_count >= 10:
+                logging.error(f"Failed to connect to pulsar after {retry_count + 1} attempts.")
+                raise
+
+            logging.error(f"Retrying pulsar initialisation. Attempt {retry_count + 1}")
+            time.sleep(2**retry_count)
+            return get_pulsar_producer(retry_count=retry_count + 1)
+
+    producer = get_pulsar_producer()
 
     if not config:
         logging.error(f"Configuration key {config_key} not found in config file.")
@@ -115,8 +136,10 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         url_count += 1
 
         body = get_next_page(next_url, config)
+        features = body.get("features", [])
+        logging.error(f"Page {url_count} features: {len(features)}")
 
-        for entry in body["features"]:
+        for entry in features:
             data = generate_stac_item(entry, config)
             try:
                 file_name = f"{entry['properties'][config['item_id_key']]}.json"
@@ -146,7 +169,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                 logging.error(e)
                 raise
         elif config["pagination_method"] == "counter":
-            if not body["features"]:
+            if not features:
                 next_url = None
             else:
                 # The counter can only go up to 50. Limit the search by last update date
@@ -182,8 +205,11 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                 "harvested_data": harvested_data,
                 "deleted_keys": [],
             }
+            logging.error(f"Sending message with {len(harvested_data.keys())} entries")
             airbus_harvester_messager.consume(msg)
+            logging.error("Uploading metadata to S3")
             upload_file_s3(json.dumps(latest_harvested), s3_bucket, metadata_s3_key, s3_client)
+            logging.error("Uploaded metadata to S3")
             harvested_data = {}
 
     # Do not updated collection
@@ -197,9 +223,14 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
     # Send message for altered keys
     msg = {"harvested_data": harvested_data, "deleted_keys": deleted_keys}
+    logging.error(
+        f"Sending message with {len(harvested_data.keys())} entries and {len(deleted_keys)} deleted keys"
+    )
     airbus_harvester_messager.consume(msg)
 
+    logging.error("Uploading metadata to S3")
     upload_file_s3(json.dumps(latest_harvested), s3_bucket, metadata_s3_key, s3_client)
+    logging.error("Uploaded metadata to S3")
 
 
 def compare_to_previous_version(
@@ -264,7 +295,7 @@ def simplify_catalogue_data_summary(all_data: dict) -> dict:
     }
 
 
-def generate_access_token(env: str = "dev") -> str:
+def generate_access_token(env: str = "dev", retry_count: int = 0) -> str:
     """Generate access token for Airbus API"""
     if env == "prod":
         url = "https://authenticate.foundation.api.oneatlas.airbus.com/auth/realms/IDP/protocol/openid-connect/token"
@@ -283,9 +314,28 @@ def generate_access_token(env: str = "dev") -> str:
         ("client_id", "IDP"),
     ]
 
-    response = requests.post(url, headers=headers, data=data)
+    try:
+        logging.error(f"Making POST request to {url} for access token")
+        response = requests.post(url, headers=headers, data=data, timeout=10)
+        logging.error(f"Response status code: {response.status_code}")
+        response.raise_for_status()
+        access_token = response.json().get("access_token")
 
-    return response.json().get("access_token")
+        if access_token:
+            return access_token
+        else:
+            raise ValueError("Access token is None")
+
+    except (ConnectionError, HTTPError, Timeout, ValueError) as e:
+        logging.error(e)
+        logging.error(traceback.format_exc())
+        if retry_count >= max_api_retries:
+            logging.error(f"Failed to generate access token after {retry_count + 1} attempts.")
+            raise
+
+        logging.error(f"Retrying access token generation. Attempt {retry_count + 1}")
+        time.sleep(2**retry_count)
+        return generate_access_token(env, retry_count=retry_count + 1)
 
 
 def get_next_page(url: str, config: dict, retry_count: int = 0) -> dict:
@@ -297,19 +347,27 @@ def get_next_page(url: str, config: dict, retry_count: int = 0) -> dict:
             access_token = generate_access_token(config["auth_env"])
             headers["Authorization"] = "Bearer " + access_token
 
+        logging.error(
+            f"Making {config['request_method'].upper()} request to {url} with body {config['body']}"
+        )
         if config["request_method"].upper() == "POST":
-            response = requests.post(url, json=config["body"], headers=headers)
+            response = requests.post(url, json=config["body"], headers=headers, timeout=10)
         else:
-            response = requests.get(url, json=config["body"], headers=headers)
+            response = requests.get(url, json=config["body"], headers=headers, timeout=10)
+        logging.error(f"Response status code: {response.status_code}")
         response.raise_for_status()
 
         return response.json()
 
-    except (JSONDecodeError, requests.exceptions.HTTPError):
-        logging.warning(f"Retrying retrieval of {url}. Attempt {retry_count}")
-        if retry_count > 3:
+    except (JSONDecodeError, ConnectionError, HTTPError, Timeout) as e:
+        logging.error(e)
+        logging.error(traceback.format_exc())
+        if retry_count > max_api_retries:
+            logging.error(f"Failed to obtain valid response after {retry_count + 1} attempts.")
             raise
 
+        logging.error(f"Retrying retrieval of {url}. Attempt {retry_count + 1}")
+        time.sleep(5**retry_count)
         return get_next_page(url, config, retry_count=retry_count + 1)
 
 
@@ -427,12 +485,13 @@ def modify_value(key, value) -> str:
 def generate_stac_item(data: dict, config: dict) -> dict:
     """Catalogue items for Airbus data"""
     item_id = data["properties"][config["item_id_key"]]
+    logging.error(f"Processing item {item_id}")
 
     coordinates = data["geometry"]["coordinates"][0]
     bbox = coordinates_to_bbox(coordinates)
 
     mapped_keys = set()
-    properties = config["stac_properties"]
+    properties = config["stac_properties"].copy()
 
     links = []
     assets = {}
