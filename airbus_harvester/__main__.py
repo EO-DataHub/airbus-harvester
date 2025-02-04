@@ -27,6 +27,7 @@ logging.basicConfig(
 
 minimum_message_entries = int(os.environ.get("MINIMUM_MESSAGE_ENTRIES", 100))
 proxy_base_url = os.environ.get("PROXY_BASE_URL", "")
+max_api_retries = int(os.environ.get("MAX_API_RETRIES", 5))
 
 
 def load_config(config_path):
@@ -328,7 +329,7 @@ def generate_access_token(env: str = "dev", retry_count: int = 0) -> str:
     except (ConnectionError, HTTPError, Timeout, ValueError) as e:
         logging.error(e)
         logging.error(traceback.format_exc())
-        if retry_count >= 3:
+        if retry_count >= max_api_retries:
             logging.error(f"Failed to generate access token after {retry_count + 1} attempts.")
             raise
 
@@ -361,7 +362,7 @@ def get_next_page(url: str, config: dict, retry_count: int = 0) -> dict:
     except (JSONDecodeError, ConnectionError, HTTPError, Timeout) as e:
         logging.error(e)
         logging.error(traceback.format_exc())
-        if retry_count > 5:
+        if retry_count > max_api_retries:
             logging.error(f"Failed to obtain valid response after {retry_count + 1} attempts.")
             raise
 
