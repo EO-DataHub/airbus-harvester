@@ -387,9 +387,9 @@ def test_handle_external_url__with_quicklook(mock_config):
         data, links, assets, mapped_keys, external_url["name"], external_url["path"]
     )
 
-    assert len(assets) == len(links) == len(mapped_keys) == 1
+    assert len(assets) == len(mapped_keys) == 1
+    assert len(links) == 0
     assert "quicklookUrl" in mapped_keys
-    assert {"rel", "href", "type"}.issubset(links[0].keys())
     assert {"href", "type"}.issubset(assets["thumbnail"].keys())
 
 

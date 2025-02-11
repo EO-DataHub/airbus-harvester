@@ -459,7 +459,6 @@ def handle_external_url(
         mime_type = mime_types.get(file_extension, "application/octet-stream")
 
         def add_link_and_asset(rel_name, href):
-            links.append({"rel": rel_name, "href": href, "type": mime_type})
             assets[rel_name] = {"href": href, "type": mime_type}
 
         if proxy:
