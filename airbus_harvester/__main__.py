@@ -458,15 +458,15 @@ def handle_external_url(
         file_extension = os.path.splitext(external_url)[1].lower()
         mime_type = mime_types.get(file_extension, "application/octet-stream")
 
-        def add_link_and_asset(rel_name, href):
+        def add_asset(rel_name, href):
             assets[rel_name] = {"href": href, "type": mime_type}
 
         if proxy:
             proxy_url = f"{proxy}/{name}"
-            add_link_and_asset(f"external_{name}", external_url)
-            add_link_and_asset(name, proxy_url)
+            add_asset(f"external_{name}", external_url)
+            add_asset(name, proxy_url)
         else:
-            add_link_and_asset(name, external_url)
+            add_asset(name, external_url)
         mapped_keys.add(key)
 
 
