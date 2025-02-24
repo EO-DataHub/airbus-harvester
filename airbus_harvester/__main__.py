@@ -19,15 +19,14 @@ from requests.exceptions import ConnectionError, HTTPError, Timeout
 
 from airbus_harvester.airbus_harvester_messager import AirbusHarvesterMessager
 
-setup_logging()
+setup_logging(verbosity=2)  # DEBUG level
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
 
 minimum_message_entries = int(os.environ.get("MINIMUM_MESSAGE_ENTRIES", 100))
 proxy_base_url = os.environ.get("PROXY_BASE_URL", "")
 max_api_retries = int(os.environ.get("MAX_API_RETRIES", 5))
+
+commercial_catalogue_root = os.getenv("COMMERCIAL_CATALOGUE_ROOT", "commercial")
 
 
 def load_config(config_path):
@@ -90,7 +89,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     producer = get_pulsar_producer()
 
     if not config:
-        logging.error(f"Configuration key {config_key} not found in config file.")
+        logging.warning(f"Configuration key {config_key} not found in config file.")
 
     airbus_harvester_messager = AirbusHarvesterMessager(
         s3_client=s3_client,
@@ -102,22 +101,22 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     harvested_data = {}
     latest_harvested = {}
 
-    logging.error(f"Harvesting from Airbus {config_key}")
+    logging.info(f"Harvesting from Airbus {config_key}")
 
-    key_root = "supported-datasets/airbus"
+    key_root = f"{commercial_catalogue_root}/airbus"
 
     metadata_s3_key = f"harvested-metadata/{config['collection_name']}"
     previously_harvested = get_metadata(s3_bucket, metadata_s3_key, s3_client)
-    logging.error(f"Previously harvested URLs: {previously_harvested}")
+    logging.info(f"Previously harvested URLs: {previously_harvested}")
     latest_harvested = {}
 
     catalogue_data = make_catalogue()
-    catalogue_key = "supported-datasets/airbus.json"
+    catalogue_key = f"{key_root}.json"
     previous_hash = previously_harvested.pop(catalogue_key, None)
     file_hash = get_file_hash(json.dumps(catalogue_data))
     if not previous_hash or previous_hash != file_hash:
         # URL was not harvested previously
-        logging.error(f"Added: {catalogue_key}")
+        logging.info(f"Added: {catalogue_key}")
         harvested_data[catalogue_key] = catalogue_data
         latest_harvested[catalogue_key] = file_hash
 
@@ -137,7 +136,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
         body = get_next_page(next_url, config)
         features = body.get("features", [])
-        logging.error(f"Page {url_count} features: {len(features)}")
+        logging.info(f"Page {url_count} features: {len(features)}")
 
         for entry in features:
             data = generate_stac_item(entry, config)
@@ -150,11 +149,11 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
                 if not previous_hash or previous_hash != file_hash:
                     # Data was not harvested previously
-                    logging.error(f"Added: {key}")
+                    logging.info(f"Added: {key}")
                     harvested_data[key] = data
                     latest_harvested[key] = file_hash
                 else:
-                    logging.error(f"Skipping: {key}")
+                    logging.info(f"Skipping: {key}")
             except KeyError:
                 logging.error(f"Invalid entry in {next_url}")
 
@@ -179,7 +178,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                     ] = f"[2018-10-03T12:00:00Z,{entry['properties']['lastUpdateDate']}]"
                 config["body"]["startPage"] = (url_count % 50) + 1
 
-        logging.error(f"Page {url_count} next URL: {next_url}")
+        logging.info(f"Page {url_count} next URL: {next_url}")
 
         summary = get_stac_collection_summary(catalogue_data_summary)
 
@@ -192,7 +191,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         file_hash = get_file_hash(json.dumps(collection_data))
         if not previous_hash or previous_hash != file_hash:
             # Data was not harvested previously
-            logging.error(f"Added: {collection_key}")
+            logging.info(f"Added: {collection_key}")
             harvested_data[collection_key] = collection_data
             latest_harvested[collection_key] = file_hash
 
@@ -205,11 +204,11 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                 "harvested_data": harvested_data,
                 "deleted_keys": [],
             }
-            logging.error(f"Sending message with {len(harvested_data.keys())} entries")
+            logging.info(f"Sending message with {len(harvested_data.keys())} entries")
             airbus_harvester_messager.consume(msg)
-            logging.error("Uploading metadata to S3")
+            logging.info("Uploading metadata to S3")
             upload_file_s3(json.dumps(latest_harvested), s3_bucket, metadata_s3_key, s3_client)
-            logging.error("Uploaded metadata to S3")
+            logging.info("Uploaded metadata to S3")
             harvested_data = {}
 
     # Do not updated collection
@@ -223,14 +222,14 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
     # Send message for altered keys
     msg = {"harvested_data": harvested_data, "deleted_keys": deleted_keys}
-    logging.error(
+    logging.info(
         f"Sending message with {len(harvested_data.keys())} entries and {len(deleted_keys)} deleted keys"
     )
     airbus_harvester_messager.consume(msg)
 
-    logging.error("Uploading metadata to S3")
+    logging.info("Uploading metadata to S3")
     upload_file_s3(json.dumps(latest_harvested), s3_bucket, metadata_s3_key, s3_client)
-    logging.error("Uploaded metadata to S3")
+    logging.info("Uploaded metadata to S3")
 
 
 def compare_to_previous_version(
@@ -315,9 +314,9 @@ def generate_access_token(env: str = "dev", retry_count: int = 0) -> str:
     ]
 
     try:
-        logging.error(f"Making POST request to {url} for access token")
+        logging.info(f"Making POST request to {url} for access token")
         response = requests.post(url, headers=headers, data=data, timeout=10)
-        logging.error(f"Response status code: {response.status_code}")
+        logging.info(f"Response status code: {response.status_code}")
         response.raise_for_status()
         access_token = response.json().get("access_token")
 
@@ -347,14 +346,14 @@ def get_next_page(url: str, config: dict, retry_count: int = 0) -> dict:
             access_token = generate_access_token(config["auth_env"])
             headers["Authorization"] = "Bearer " + access_token
 
-        logging.error(
+        logging.info(
             f"Making {config['request_method'].upper()} request to {url} with body {config['body']}"
         )
         if config["request_method"].upper() == "POST":
             response = requests.post(url, json=config["body"], headers=headers, timeout=10)
         else:
             response = requests.get(url, json=config["body"], headers=headers, timeout=10)
-        logging.error(f"Response status code: {response.status_code}")
+        logging.info(f"Response status code: {response.status_code}")
         response.raise_for_status()
 
         return response.json()
@@ -484,7 +483,7 @@ def modify_value(key, value) -> str:
 def generate_stac_item(data: dict, config: dict) -> dict:
     """Catalogue items for Airbus data"""
     item_id = data["properties"][config["item_id_key"]]
-    logging.error(f"Processing item {item_id}")
+    logging.info(f"Processing item {item_id}")
 
     coordinates = data["geometry"]["coordinates"][0]
     bbox = coordinates_to_bbox(coordinates)
@@ -504,7 +503,7 @@ def generate_stac_item(data: dict, config: dict) -> dict:
         proxy_url = None
         if url_config.get("proxy", False):
             proxy_url = (
-                f"{proxy_base_url}/api/catalogue/stac/catalogs/supported-datasets/airbus/"
+                f"{proxy_base_url}/api/catalogue/stac/catalogs/{commercial_catalogue_root}/catalogs/airbus/"
                 f"collections/{config['collection_name']}/items/{item_id}"
             )
         handle_external_url(
