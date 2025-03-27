@@ -13,7 +13,7 @@
             "sar:center_frequency": 9.65
         },
         "stac_properties_map": {
-            "datetime": "catalogueTime",
+            "datetime": "startTime",
             "start_datetime": "startTime",
             "end_datetime": "stopTime",
             "updated": "lastUpdateTime",

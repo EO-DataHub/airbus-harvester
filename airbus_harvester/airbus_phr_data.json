@@ -3,7 +3,7 @@
     "id": "airbus_phr_data",
     "stac_version": "1.0.0",
     "stac_extensions": [],
-    "description": "The identical Pléiades 1A and Pléiades 1B satellites deliver 50cm imagery products with a 20km swath. Their location accuracy and image quality are excellent, making them an ideal source of data for both civil or military projects. The space and ground segment have been designed to provide data in record time, ensuring daily revisit capacity anywhere on the globe and unrivalled reliability when it comes to collecting new images.",
+    "description": "The Pléiades constellation is Airbus' main very high resolution programme, expanding and consolidating on the SPOT legacy with the identical Pléiades 1A and Pléiades 1B launched in 2011 and 2012. These satellites operate as a true constellation, combining a twice-daily revisit capability with an ingenious range of resolutions. Pléiades collects imagery with a 50 cm panchromatic and four 2 m multispectral bands across a 20 km swath, making them an ideal source of data for a wide range of environmental, civil, and military needs.",
     "links": [],
     "title": "Airbus PHR Data",
     "geometry": {
@@ -29,6 +29,15 @@
         "constellation": [
             "PHR"
         ]
+    },
+    "assets": {
+      "thumbnail": {
+        "href": "{EODHP_BASE_URL}/api/catalogue/stac/catalogs/commercial/catalogs/airbus/collections/airbus_phr_data/thumbnail",
+        "type": "image/jpg",
+        "roles": [
+          "thumbnail"
+        ]
+      }
     },
     "item_assets": {
         "thumbnail": {
