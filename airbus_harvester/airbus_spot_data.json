@@ -17,6 +17,11 @@
             "interval": []
         }
     },
+    "providers": [
+        {
+            "name": "Airbus"
+        }
+    ],
     "license": "proprietary",
     "keywords": [
         "airbus"
