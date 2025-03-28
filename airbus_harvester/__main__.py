@@ -103,7 +103,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
     logging.info(f"Harvesting from Airbus {config_key}")
 
-    key_root = f"{commercial_catalogue_root}/airbus"
+    key_root = f"{commercial_catalogue_root}/catalogs/airbus"
 
     metadata_s3_key = f"harvested-metadata/{config['collection_name']}"
     previously_harvested = get_metadata(s3_bucket, metadata_s3_key, s3_client)
@@ -120,7 +120,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         harvested_data[catalogue_key] = catalogue_data
         latest_harvested[catalogue_key] = file_hash
 
-    collection_key = f"{key_root}/{config['collection_name']}.json"
+    collection_key = f"{key_root}/collections/{config['collection_name']}.json"
 
     catalogue_data_summary = previously_harvested.pop("summary", None)
     if not catalogue_data_summary:
@@ -142,7 +142,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
             data = generate_stac_item(entry, config)
             try:
                 file_name = f"{entry['properties'][config['item_id_key']]}.json"
-                key = f"{key_root}/{config['collection_name']}/{file_name}"
+                key = f"{key_root}/collections/{config['collection_name']}/items/{file_name}"
 
                 previous_hash = previously_harvested.pop(key, None)
                 file_hash = get_file_hash(json.dumps(data))
