@@ -424,6 +424,9 @@ def generate_stac_collection(all_data_summary: dict, config: dict) -> dict:
         "spatial": {"bbox": [all_data_summary["bbox"]]},
         "temporal": {"interval": [[all_data_summary["start_time"], all_data_summary["stop_time"]]]},
     }
+    for _asset_name, asset in stac_template.get("assets").items():
+        if "href" in asset:
+            asset["href"] = asset["href"].replace("{EODHP_BASE_URL}", proxy_base_url)
     return stac_template
 
 

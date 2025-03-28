@@ -3,7 +3,7 @@
     "id": "airbus_spot_data",
     "stac_version": "1.0.0",
     "stac_extensions": [],
-    "description": "The SPOT (from French \"Satellite pour l'Observation de la Terre\") series has been supplying high-resolution, wide-area optical imagery since 1986. The latest satellites in the series, SPOT 6 and SPOT 7, are commercial satellites owned by Airbus Defence and Space, and assure data continuity through to 2024. All of the SPOT satellites provide imagery in panchromatic and multispectral bands with a swath of 60 km.",
+    "description": "SPOT is designed to efficiently cover huge areas in record time, making it a perfect choice for cartography and monitoring applications. The SPOT satellites build upon a legacy of data that began 30 years ago with the launch of the original SPOT 1 satellite in 1986. This legacy means that today, users have access to a vast archive of high-resolution imagery collected over the past decade, spanning billions of km² and offering unique historical insights. Every day SPOT acquires 3 million km² of imagery with 1.5 m panchromatic and 6 m multispectral bands.",
     "links": [],
     "title": "Airbus SPOT Data",
     "geometry": {
@@ -17,6 +17,11 @@
             "interval": []
         }
     },
+    "providers": [
+        {
+            "name": "Airbus"
+        }
+    ],
     "license": "proprietary",
     "keywords": [
         "airbus"
@@ -29,6 +34,15 @@
         "constellation": [
             "SPOT"
         ]
+    },
+    "assets": {
+      "thumbnail": {
+        "href": "{EODHP_BASE_URL}/api/catalogue/stac/catalogs/commercial/catalogs/airbus/collections/airbus_spot_data/thumbnail",
+        "type": "image/jpg",
+        "roles": [
+          "thumbnail"
+        ]
+      }
     },
     "item_assets": {
         "thumbnail": {

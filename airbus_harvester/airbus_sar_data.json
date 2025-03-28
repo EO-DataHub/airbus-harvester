@@ -6,7 +6,7 @@
         "https://stac-extensions.github.io/sar/v1.0.0/schema.json",
         "https://stac-extensions.github.io/sat/v1.0.0/schema.json"
     ],
-    "description": "The German TerraSAR-X / TanDEM-X satellite formation and the Spanish PAZ satellite (managed by Hisdesat Servicios Estratégicos S.A.) are being operated in the same orbit tube and feature identical ground swaths and imaging modes - allowing Airbus and Hisdesat to establish a unique commercial Radar Constellation. The satellites carry a high frequency X-band Synthetic Aperture Radar (SAR) sensor in order to acquire datasets ranging from very high-resolution imagery to wide area coverage.",
+    "description": "The TerraSAR-X and TanDEM-X satellites carry high frequency X-band Synthetic Aperture Radar (SAR) sensors in order to acquire datasets ranging from very high-resolution imagery to wide area coverage. Using spaceborne SAR we can provide accurate measurements, unmatched geometric accuracy and provide highly precise information of any point on Earth. Our imagery ranges from very high resolution to wide-area coverage. The satellites' proven data quality and resolution of up to 25 cm continues to be among the very best in the spaceborne commercial radar market. The constellation's capacity empowers both data-hungry services and time-critical missions, enabling a broad array of applications, including maritime monitoring, change detection, and interferometry.",
     "links": [],
     "title": "Airbus SAR Data",
     "geometry": {
@@ -20,6 +20,11 @@
             "interval": []
         }
     },
+    "providers": [
+        {
+            "name": "Airbus"
+        }
+    ],
     "license": "proprietary",
     "keywords": [
         "airbus"
@@ -95,6 +100,15 @@
             "right",
             "left"
         ]
+    },
+    "assets": {
+      "thumbnail": {
+        "href": "{EODHP_BASE_URL}/api/catalogue/stac/catalogs/commercial/catalogs/airbus/collections/airbus_sar_data/thumbnail",
+        "type": "image/jpg",
+        "roles": [
+          "thumbnail"
+        ]
+      }
     },
     "item_assets": {
         "thumbnail": {
