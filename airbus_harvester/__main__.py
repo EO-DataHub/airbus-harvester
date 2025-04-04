@@ -481,6 +481,8 @@ def modify_value(key, value) -> str:
         # Split dual polarisation channels into separate values
         return [value[i : i + 2] for i in range(0, len(value), 2)]
     elif key == "geometry_centroid":
+        if type(value) is dict:
+            return value
         # Convert list to dict for consistency throughout the catalogue
         if type(value) is list and len(value) == 2:
             return {"lat": value[1], "lon": value[0]}
