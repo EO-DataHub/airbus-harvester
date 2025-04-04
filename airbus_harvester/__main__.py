@@ -480,6 +480,13 @@ def modify_value(key, value) -> str:
     elif key == "polarizationChannels":
         # Split dual polarisation channels into separate values
         return [value[i : i + 2] for i in range(0, len(value), 2)]
+    elif key == "geometry_centroid":
+        # Convert list to dict for consistency throughout the catalogue
+        if type(value) is list and len(value) == 2:
+            return {"lat": value[1], "lon": value[0]}
+        # Type not understood - ignore it
+        return None
+
     return value
 
 
@@ -515,7 +522,8 @@ def generate_stac_item(data: dict, config: dict) -> dict:
 
     for key, value in data["properties"].items():
         if key not in mapped_keys and value is not None:
-            properties[underscore(key)] = value
+            property_key = underscore(key)
+            properties[property_key] = modify_value(property_key, value)
 
     stac_item = {
         "type": "Feature",
