@@ -100,7 +100,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     )
 
     harvested_data = {}
-    latest_harvested = {}
+    new_harvest_keys = set()
 
     logging.info(f"Harvesting from Airbus {config_key}")
 
@@ -188,7 +188,9 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         # ones from the Airbus catalogue
         collection_data = generate_stac_collection(summary, config)
         last_run_hash = latest_harvested.get(collection_key)
-        previous_hash = last_run_hash if last_run_hash else current_harvest_metadata.get(collection_key)
+        previous_hash = (
+            last_run_hash if last_run_hash else current_harvest_metadata.get(collection_key)
+        )
 
         file_hash = get_file_hash(json.dumps(collection_data))
         if not previous_hash or previous_hash != file_hash:
@@ -207,13 +209,16 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                 "deleted_keys": [],
             }
 
-            for key, value in latest_harvested:
+            for key, value in latest_harvested.items():
                 current_harvest_metadata[key] = value
+                new_harvest_keys.add(key)
 
             logging.info(f"Sending message with {len(harvested_data.keys())} entries")
             airbus_harvester_messager.consume(msg)
             logging.info("Uploading metadata to S3")
-            upload_file_s3(json.dumps(current_harvest_metadata), s3_bucket, metadata_s3_key, s3_client)
+            upload_file_s3(
+                json.dumps(current_harvest_metadata), s3_bucket, metadata_s3_key, s3_client
+            )
             logging.info("Uploaded metadata to S3")
             harvested_data = {}
             latest_harvested = {}
@@ -222,12 +227,15 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     if latest_harvested.get(collection_key) == current_harvest_metadata.get(collection_key):
         harvested_data.discard(collection_key)
 
-    deleted_keys = find_deleted_keys(current_harvest_metadata, previous_harvest_metadata)
+    for key, value in latest_harvested.items():
+        current_harvest_metadata[key] = value
+        new_harvest_keys.add(key)
+
+    deleted_keys = find_deleted_keys(new_harvest_keys, previous_harvest_metadata)
 
     # Send message for altered keys
     msg = {"harvested_data": harvested_data, "deleted_keys": deleted_keys}
-    for key, value in latest_harvested:
-        current_harvest_metadata[key] = value
+
     logging.info(
         f"Sending message with {len(harvested_data.keys())} entries and {len(deleted_keys)} deleted keys"
     )
@@ -239,7 +247,8 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
 
 def find_deleted_keys(new: dict, old: dict) -> list:
-    return list(set(new).difference(old))
+    """Find differences between two dictionaries"""
+    return list(set(old).difference(new))
 
 
 def compare_to_previous_version(

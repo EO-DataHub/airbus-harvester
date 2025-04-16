@@ -12,6 +12,7 @@ from click.testing import CliRunner
 from airbus_harvester.__main__ import (
     add_to_catalogue_data_summary,
     coordinates_to_bbox,
+    find_deleted_keys,
     generate_stac_collection,
     generate_stac_item,
     get_stac_collection_summary,
@@ -487,3 +488,12 @@ def test_add_to_all_data_summary(mock_response):
     assert all_data["coordinates"][0] == data["geometry"]["coordinates"][0][0]
     assert all_data["start_time"][0] == data["properties"]["start_datetime"]
     assert all_data["stop_time"][0] == data["properties"]["end_datetime"]
+
+
+@pytest.mark.parametrize(
+    "first,second,expected", [({"a": 1, "b": 2, "c": 3}, {"a": 10, "d": 2, "e": 3}, ["d", "e"])]
+)
+def test_find_deleted_keys(first, second, expected):
+    actual = find_deleted_keys(first, second)
+
+    assert set(actual) == set(expected)
