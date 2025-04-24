@@ -235,7 +235,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     deleted_keys = find_deleted_keys(current_harvest_keys, previous_harvest_metadata)
 
     for key in deleted_keys:
-        del current_harvest_metadata[key] 
+        del current_harvest_metadata[key]
 
     # Send message for altered keys
     msg = {"harvested_data": harvested_data, "deleted_keys": deleted_keys}
