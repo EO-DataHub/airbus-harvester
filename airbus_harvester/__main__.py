@@ -88,6 +88,8 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
             return get_pulsar_producer(retry_count=retry_count + 1)
 
     producer = get_pulsar_producer()
+    
+    s3_root = "git-harvester/"
 
     if not config:
         logging.warning(f"Configuration key {config_key} not found in config file.")
@@ -95,7 +97,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     airbus_harvester_messager = AirbusHarvesterMessager(
         s3_client=s3_client,
         output_bucket=s3_bucket,
-        cat_output_prefix="git-harvester/",
+        cat_output_prefix=s3_root,
         producer=producer,
     )
 
@@ -127,7 +129,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     current_harvest_keys.add(collection_key)
 
     is_first_harvest = True
-    old_collection_data = get_file_data(s3_bucket, collection_key, s3_client)
+    old_collection_data = get_file_data(s3_bucket, f"{s3_root}{collection_key}", s3_client)
     logging.info(f"{s3_bucket} {collection_key}, {old_collection_data}")
     if old_collection_data:
         is_first_harvest = False
