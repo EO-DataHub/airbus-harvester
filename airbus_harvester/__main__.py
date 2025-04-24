@@ -107,7 +107,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     key_root = f"{commercial_catalogue_root}/catalogs/airbus"
 
     metadata_s3_key = f"harvested-metadata/{config['collection_name']}"
-    current_harvest_metadata = get_metadata(s3_bucket, metadata_s3_key, s3_client)
+    current_harvest_metadata = get_file_s3(s3_bucket, metadata_s3_key, s3_client)
     previous_harvest_metadata = copy.deepcopy(current_harvest_metadata)
     logging.info(f"Previously harvested URLs: {current_harvest_metadata}")
     latest_harvested = {}
@@ -127,7 +127,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     current_harvest_keys.add(collection_key)
 
     is_first_harvest = True
-    old_collection_data = get_metadata(s3_bucket, collection_key, s3_client)
+    old_collection_data = get_file_s3(s3_bucket, collection_key, s3_client)
     if old_collection_data:
         is_first_harvest = False
         start_time = old_collection_data['extent']['temporal']['interval'][0][0]
