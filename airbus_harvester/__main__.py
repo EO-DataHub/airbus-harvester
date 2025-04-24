@@ -217,7 +217,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
             logging.info(f"Sending message with {len(harvested_data.keys())} entries")
             airbus_harvester_messager.consume(msg)
-            logging.info("Uploading metadata to S3")
+            logging.info(f"Uploading metadata to S3: {len(current_harvest_metadata)} items")
             upload_file_s3(
                 json.dumps(current_harvest_metadata), s3_bucket, metadata_s3_key, s3_client
             )
@@ -229,14 +229,17 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     if latest_harvested.get(collection_key) == current_harvest_metadata.get(collection_key):
         harvested_data.discard(collection_key)
 
+    logging.info(f"Adding final keys: {len(current_harvest_metadata)} items")
     for key, value in latest_harvested.items():
         current_harvest_metadata[key] = value
         current_harvest_keys.add(key)
 
     deleted_keys = find_deleted_keys(current_harvest_keys, previous_harvest_metadata)
 
+    logging.info(f"Removing {len(deleted_keys)} deleted keys: {len(current_harvest_metadata)} items")
     for key in deleted_keys:
         del current_harvest_metadata[key]
+    logging.info(f"Deleted keys removed: {len(current_harvest_metadata)} items")
 
     # Send message for altered keys
     msg = {"harvested_data": harvested_data, "deleted_keys": deleted_keys}
@@ -246,7 +249,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     )
     airbus_harvester_messager.consume(msg)
 
-    logging.info("Uploading metadata to S3")
+    logging.info(f"Uploading metadata to S3: {len(current_harvest_metadata)} items")
     upload_file_s3(json.dumps(current_harvest_metadata), s3_bucket, metadata_s3_key, s3_client)
     logging.info("Uploaded metadata to S3")
 
