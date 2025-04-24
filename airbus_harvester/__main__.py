@@ -115,6 +115,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     catalogue_data = make_catalogue()
     catalogue_key = f"{key_root}.json"
     previous_hash = current_harvest_metadata.pop(catalogue_key, None)
+    current_harvest_keys.add(catalogue_key)
     file_hash = get_file_hash(json.dumps(catalogue_data))
     if not previous_hash or previous_hash != file_hash:
         # URL was not harvested previously
@@ -233,6 +234,9 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
     deleted_keys = find_deleted_keys(current_harvest_keys, previous_harvest_metadata)
 
+    for key in deleted_keys:
+        del current_harvest_metadata[key] 
+
     # Send message for altered keys
     msg = {"harvested_data": harvested_data, "deleted_keys": deleted_keys}
 
@@ -246,7 +250,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     logging.info("Uploaded metadata to S3")
 
 
-def find_deleted_keys(new: dict, old: dict) -> list:
+def find_deleted_keys(new: set, old: dict) -> list:
     """Find differences between two dictionaries"""
     return list(set(old).difference(new))
 
