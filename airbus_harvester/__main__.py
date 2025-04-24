@@ -114,7 +114,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
     catalogue_data = make_catalogue()
     catalogue_key = f"{key_root}.json"
-    previous_hash = current_harvest_metadata.pop(catalogue_key, None)
+    previous_hash = current_harvest_metadata.get(catalogue_key)
     current_harvest_keys.add(catalogue_key)
     file_hash = get_file_hash(json.dumps(catalogue_data))
     if not previous_hash or previous_hash != file_hash:
@@ -124,8 +124,9 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         latest_harvested[catalogue_key] = file_hash
 
     collection_key = f"{key_root}/collections/{config['collection_name']}.json"
+    current_harvest_keys.add(collection_key)
 
-    catalogue_data_summary = current_harvest_metadata.pop("summary", None)
+    catalogue_data_summary = current_harvest_metadata.get("summary")
     if not catalogue_data_summary:
         catalogue_data_summary = {"start_time": [], "stop_time": [], "coordinates": []}
 
@@ -148,7 +149,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                 key = f"{key_root}/collections/{config['collection_name']}/items/{file_name}"
                 current_harvest_keys.add(key)
 
-                previous_hash = current_harvest_metadata.pop(key, None)
+                previous_hash = current_harvest_metadata.get(key)
                 file_hash = get_file_hash(json.dumps(data))
 
                 if not previous_hash or previous_hash != file_hash:
