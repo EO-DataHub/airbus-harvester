@@ -145,6 +145,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     if not catalogue_data_summary:
         catalogue_data_summary = {"start_time": [], "stop_time": [], "coordinates": []}
 
+    import sys;sys.exit()
     next_url = config["url"]
     url_count = 0
 
