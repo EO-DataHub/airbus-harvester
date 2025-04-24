@@ -100,7 +100,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     )
 
     harvested_data = {}
-    new_harvest_keys = set()
+    current_harvest_keys = set()
 
     logging.info(f"Harvesting from Airbus {config_key}")
 
@@ -145,7 +145,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
             try:
                 file_name = f"{entry['properties'][config['item_id_key']]}.json"
                 key = f"{key_root}/collections/{config['collection_name']}/items/{file_name}"
-                new_harvest_keys.add(key)
+                current_harvest_keys.add(key)
 
                 previous_hash = current_harvest_metadata.pop(key, None)
                 file_hash = get_file_hash(json.dumps(data))
@@ -229,9 +229,9 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
     for key, value in latest_harvested.items():
         current_harvest_metadata[key] = value
-        new_harvest_keys.add(key)
+        current_harvest_keys.add(key)
 
-    deleted_keys = find_deleted_keys(new_harvest_keys, previous_harvest_metadata)
+    deleted_keys = find_deleted_keys(current_harvest_keys, previous_harvest_metadata)
 
     # Send message for altered keys
     msg = {"harvested_data": harvested_data, "deleted_keys": deleted_keys}
