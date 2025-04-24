@@ -128,6 +128,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
     is_first_harvest = True
     old_collection_data = get_file_data(s3_bucket, collection_key, s3_client)
+    logging.info(f"{s3_bucket} {collection_key}, {old_collection_data}")
     if old_collection_data:
         is_first_harvest = False
         start_time = old_collection_data['extent']['temporal']['interval'][0][0]
@@ -177,10 +178,12 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                 logging.error(f"Invalid entry in {next_url}")
 
             catalogue_data_summary = add_to_catalogue_data_summary(catalogue_data_summary, data)
-            old_catalogue_data_summary = add_to_catalogue_data_summary(old_catalogue_data_summary, data)
+            if not is_first_harvest:
+                old_catalogue_data_summary = add_to_catalogue_data_summary(old_catalogue_data_summary, data)
 
         catalogue_data_summary = simplify_catalogue_data_summary(catalogue_data_summary)
-        old_catalogue_data_summary = simplify_catalogue_data_summary(old_catalogue_data_summary)
+        if not is_first_harvest:
+            old_catalogue_data_summary = simplify_catalogue_data_summary(old_catalogue_data_summary)
 
         if config["pagination_method"] == "link":
             try:
