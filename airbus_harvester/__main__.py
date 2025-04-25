@@ -133,8 +133,8 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     logging.info(f"{s3_bucket} {collection_key}, {old_collection_data}")
     if old_collection_data:
         is_first_harvest = False
-        start_time = old_collection_data["extent"]["temporal"]["interval"][0][0].split('.')[0]
-        stop_time = old_collection_data["extent"]["temporal"]["interval"][0][1].split('.')[0]
+        start_time = old_collection_data["extent"]["temporal"]["interval"][0][0].split(".")[0]
+        stop_time = old_collection_data["extent"]["temporal"]["interval"][0][1].split(".")[0]
 
         bbox = old_collection_data["extent"]["spatial"]["bbox"][0]
         coordinates = [[bbox[1], bbox[0]], [bbox[3], bbox[2]]]
