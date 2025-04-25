@@ -89,7 +89,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
             return get_pulsar_producer(retry_count=retry_count + 1)
 
     producer = get_pulsar_producer()
-    
+
     s3_root = "git-harvester/"
 
     if not config:
@@ -134,21 +134,24 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     logging.info(f"{s3_bucket} {collection_key}, {old_collection_data}")
     if old_collection_data:
         is_first_harvest = False
-        start_time = old_collection_data['extent']['temporal']['interval'][0][0]
-        stop_time = old_collection_data['extent']['temporal']['interval'][0][1]
+        start_time = old_collection_data["extent"]["temporal"]["interval"][0][0]
+        stop_time = old_collection_data["extent"]["temporal"]["interval"][0][1]
         datetime_format = "%Y-%m-%dT%H:%M:%S.%fZ"
 
-        bbox = old_collection_data['extent']['spatial']['bbox'][0]
+        bbox = old_collection_data["extent"]["spatial"]["bbox"][0]
         coordinates = [[bbox[1], bbox[0]], [bbox[3], bbox[2]]]
 
-        old_catalogue_data_summary = {"start_time": [datetime.datetime.strptime(start_time, datetime_format)], "stop_time": [datetime.datetime.strptime(stop_time, datetime_format)], "coordinates": coordinates}
+        old_catalogue_data_summary = {
+            "start_time": [datetime.datetime.strptime(start_time, datetime_format)],
+            "stop_time": [datetime.datetime.strptime(stop_time, datetime_format)],
+            "coordinates": coordinates,
+        }
         logging.info(f"Previous harvest data recovered: {old_catalogue_data_summary}")
 
     catalogue_data_summary = current_harvest_metadata.get("summary")
     if not catalogue_data_summary:
         catalogue_data_summary = {"start_time": [], "stop_time": [], "coordinates": []}
 
-    import sys;sys.exit()
     next_url = config["url"]
     url_count = 0
 
@@ -183,7 +186,9 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
             catalogue_data_summary = add_to_catalogue_data_summary(catalogue_data_summary, data)
             if not is_first_harvest:
-                old_catalogue_data_summary = add_to_catalogue_data_summary(old_catalogue_data_summary, data)
+                old_catalogue_data_summary = add_to_catalogue_data_summary(
+                    old_catalogue_data_summary, data
+                )
 
         catalogue_data_summary = simplify_catalogue_data_summary(catalogue_data_summary)
         if not is_first_harvest:
@@ -251,7 +256,6 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
             harvested_data = {}
             latest_harvested = {}
 
- 
     summary = get_stac_collection_summary(catalogue_data_summary)
     collection_data = generate_stac_collection(summary, config)
     file_hash = get_file_hash(json.dumps(collection_data))
@@ -267,7 +271,9 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
     deleted_keys = find_deleted_keys(current_harvest_keys, previous_harvest_metadata)
 
-    logging.info(f"Removing {len(deleted_keys)} deleted keys: {len(current_harvest_metadata)} items")
+    logging.info(
+        f"Removing {len(deleted_keys)} deleted keys: {len(current_harvest_metadata)} items"
+    )
     for key in deleted_keys:
         del current_harvest_metadata[key]
     logging.info(f"Deleted keys removed: {len(current_harvest_metadata)} items")
