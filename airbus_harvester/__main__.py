@@ -183,6 +183,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
             except KeyError:
                 logging.error(f"Invalid entry in {next_url}")
 
+            # Update both summaries (if an old one does exist)
             catalogue_data_summary = add_to_catalogue_data_summary(catalogue_data_summary, data)
             if not is_first_harvest:
                 old_catalogue_data_summary = add_to_catalogue_data_summary(
@@ -212,6 +213,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
         logging.info(f"Page {url_count} next URL: {next_url}")
 
+        # Use old summary if it exists - likely to be more accurate during harvest
         if is_first_harvest:
             summary = get_stac_collection_summary(catalogue_data_summary)
         else:
@@ -226,6 +228,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         )
 
         file_hash = get_file_hash(json.dumps(collection_data))
+        # Make sure collection level is sent during first message. Only send changes after that
         if url_count == 1 or (not previous_hash or previous_hash != file_hash):
             # Data was not harvested previously
             logging.info(f"Added: {collection_key}")
@@ -255,6 +258,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
             harvested_data = {}
             latest_harvested = {}
 
+    # Make sure new collection is sent in final message
     summary = get_stac_collection_summary(catalogue_data_summary)
     collection_data = generate_stac_collection(summary, config)
     file_hash = get_file_hash(json.dumps(collection_data))
@@ -263,11 +267,13 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     harvested_data[collection_key] = collection_data
     latest_harvested[collection_key] = file_hash
 
+    # Any leftover items not sent during final loop because the minimum wasn't met
     logging.info(f"Adding final keys: {len(current_harvest_metadata)} items")
     for key, value in latest_harvested.items():
         current_harvest_metadata[key] = value
         current_harvest_keys.add(key)
 
+    # Compare items harvested this run to the ones harvested in the previous run to find deletions
     deleted_keys = find_deleted_keys(current_harvest_keys, previous_harvest_metadata)
 
     logging.info(
