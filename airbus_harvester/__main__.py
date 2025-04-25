@@ -228,7 +228,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         )
 
         file_hash = get_file_hash(json.dumps(collection_data))
-        if is_first_harvest and not previous_hash or previous_hash != file_hash:
+        if url_count == 1 or (not previous_hash or previous_hash != file_hash):
             # Data was not harvested previously
             logging.info(f"Added: {collection_key}")
             harvested_data[collection_key] = collection_data
