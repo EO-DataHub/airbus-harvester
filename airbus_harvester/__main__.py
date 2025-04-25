@@ -337,6 +337,10 @@ def add_to_catalogue_data_summary(all_data: dict, data: dict) -> dict:
 
 def simplify_catalogue_data_summary(all_data: dict) -> dict:
     """Finds the coordinates containing bbox values, and start and stop time of all data so far"""
+    
+    logging.info('AAAAAAAAAAAAAAA')
+    logging.info(all_data)
+    
     biggest_lat = smallest_lat = biggest_long = smallest_long = all_data["coordinates"][0]
 
     for coordinates in all_data["coordinates"]:
