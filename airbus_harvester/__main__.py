@@ -1,5 +1,4 @@
 import copy
-import datetime
 import hashlib
 import json
 import logging
@@ -134,16 +133,15 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     logging.info(f"{s3_bucket} {collection_key}, {old_collection_data}")
     if old_collection_data:
         is_first_harvest = False
-        start_time = old_collection_data["extent"]["temporal"]["interval"][0][0]
-        stop_time = old_collection_data["extent"]["temporal"]["interval"][0][1]
-        datetime_format = "%Y-%m-%dT%H:%M:%S.%fZ"
+        start_time = old_collection_data["extent"]["temporal"]["interval"][0][0].split('.')[0]
+        stop_time = old_collection_data["extent"]["temporal"]["interval"][0][1].split('.')[0]
 
         bbox = old_collection_data["extent"]["spatial"]["bbox"][0]
         coordinates = [[bbox[1], bbox[0]], [bbox[3], bbox[2]]]
 
         old_catalogue_data_summary = {
-            "start_time": [datetime.datetime.strptime(start_time, datetime_format)],
-            "stop_time": [datetime.datetime.strptime(stop_time, datetime_format)],
+            "start_time": [f"{start_time}Z"],
+            "stop_time": [f"{stop_time}Z"],
             "coordinates": coordinates,
         }
         logging.info(f"Previous harvest data recovered: {old_catalogue_data_summary}")
@@ -337,10 +335,7 @@ def add_to_catalogue_data_summary(all_data: dict, data: dict) -> dict:
 
 def simplify_catalogue_data_summary(all_data: dict) -> dict:
     """Finds the coordinates containing bbox values, and start and stop time of all data so far"""
-    
-    logging.info('AAAAAAAAAAAAAAA')
-    logging.info(all_data)
-    
+
     biggest_lat = smallest_lat = biggest_long = smallest_long = all_data["coordinates"][0]
 
     for coordinates in all_data["coordinates"]:
