@@ -156,8 +156,6 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     next_url = config["url"]
     url_count = 0
 
-    deleted_keys = []
-
     while next_url:
         url_count += 1
 
