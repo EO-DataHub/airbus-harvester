@@ -577,8 +577,8 @@ def generate_stac_item(data: dict, config: dict) -> dict:
     assets = {}
 
     for stac_key, airbus_key in config["stac_properties_map"].items():
-        if airbus_key in data["properties"]:
-            properties[stac_key] = modify_value(airbus_key, data["properties"][airbus_key])
+        if (value := data["properties"].get(airbus_key)) not in [None, ""]:
+            properties[stac_key] = modify_value(airbus_key, value)
             mapped_keys.add(airbus_key)
 
     for url_config in config["external_urls"]:
@@ -593,7 +593,7 @@ def generate_stac_item(data: dict, config: dict) -> dict:
         )
 
     for key, value in data["properties"].items():
-        if key not in mapped_keys and value is not None:
+        if key not in mapped_keys and value not in [None, ""]:
             property_key = underscore(key)
             properties[property_key] = modify_value(property_key, value)
 
