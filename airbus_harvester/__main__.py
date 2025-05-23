@@ -585,7 +585,7 @@ def generate_stac_item(data: dict, config: dict) -> dict:
         proxy_url = None
         if url_config.get("proxy", False):
             proxy_url = (
-                f"{proxy_base_url}/api/catalogue/stac/catalogs/{commercial_catalogue_root}/catalogs/airbus/"
+                f"{proxy_base_url}/api/catalogue/stac/{commercial_catalogue_root}/catalogs/airbus/"
                 f"collections/{config['collection_name']}/items/{item_id}"
             )
         handle_external_url(
