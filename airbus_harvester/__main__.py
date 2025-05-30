@@ -136,15 +136,15 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
     if old_collection_data:
         is_first_harvest = False
-        start_time = old_collection_data["extent"]["temporal"]["interval"][0][0].split(".")[0].rstrip("Z")
-        stop_time = old_collection_data["extent"]["temporal"]["interval"][0][1].split(".")[0].rstrip("Z")
+        start_time = old_collection_data["extent"]["temporal"]["interval"][0][0].split(".")[0]
+        stop_time = old_collection_data["extent"]["temporal"]["interval"][0][1].split(".")[0]
 
         bbox = old_collection_data["extent"]["spatial"]["bbox"][0]
         coordinates = [[bbox[1], bbox[0]], [bbox[3], bbox[2]]]
 
         old_catalogue_data_summary = {
-            "start_time": [f"{start_time}Z"],
-            "stop_time": [f"{stop_time}Z"],
+            "start_time": [f"{start_time.rstrip("Z")}Z"],
+            "stop_time": [f"{stop_time.rstrip("Z")}Z"],
             "coordinates": coordinates,
         }
         logging.info(f"Previous harvest data recovered: {old_catalogue_data_summary}")
