@@ -1,104 +1,140 @@
-# UK EO Data Hub Platform: template repository
+# Airbus Harvester
 
-# Development of this component
+The Airbus Harvester is a component of the EODHP (Earth Observation Data Hub Platform) project, designed to regularly collect and process archive imagery metadata from Airbus APIs. This harvester supports both optical (Pléiades, Pléiades Neo, SPOT) and radar (SAR) datasets.
 
-## Getting started
+On each run, the harvester queries the relevant Airbus API endpoints, compares the current catalogue with the previous run, and identifies new, updated, or deleted items. It converts the API responses into STAC (SpatioTemporal Asset Catalog) format, storing the resulting STAC items in S3. To track changes efficiently, it maintains a hash of the metadata for each file.
 
-### Install via makefile
+After updating the catalogue, the harvester sends a message to the upstream "harvested" Pulsar topic, enabling downstream components in the EODHP pipeline to react to new or changed data. The harvester also updates the STAC catalogue and collection summaries, including temporal and spatial intervals, to provide a comprehensive and up-to-date view of the available Airbus imagery.
 
-```commandline
+## Features
+
+- Regularly harvests Airbus archive imagery metadata (optical and radar).
+- Detects new, updated, and deleted items by comparing metadata hashes with previous runs.
+- Converts API responses to STAC-compliant items and collections.
+- Stores STAC items in S3.
+- Publishes messages to a Pulsar topic for downstream processing.
+- Maintains metadata hashes for efficient change tracking.
+- Maintains an overarching STAC catalogue and collection.
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.12+
+- GNU Make
+- AWS credentials (for S3 access)
+- Access to Pulsar (for messaging)
+- Access to Airbus APIs
+
+### Setup
+
+Clone the repository and run the setup using the Makefile:
+
+```sh
+git clone https://github.com/EO-Datahub/airbus-harvester.git
+cd airbus-harvester
 make setup
 ```
 
-This will create a virtual environment called `venv`, build `requirements.txt` and
-`requirements-dev.txt` from `pyproject.toml` if they're out of date, install the Python
-and Node dependencies and install `pre-commit`.
+This will:
 
-It's safe and fast to run `make setup` repeatedly as it will only update these things if
-they have changed.
+- Create a virtual environment (`venv`)
+- Build and install requirements from `pyproject.toml`
+- Install pre-commit hooks
 
-After `make setup` you can run `pre-commit` to run pre-commit checks on staged changes and
-`pre-commit run --all-files` to run them on all files. This replicates the linter checks that
-run from GitHub actions.
+You can safely run `make setup` repeatedly; it will only update things if needed.
 
+## Configuration
 
-### Alternative installation
+Configuration is managed via `config.json`.  
+You can specify which dataset to harvest by setting the `HARVESTER_CONFIG_KEY` environment variable (e.g., `SPOT`, `PNEO`, `PHR`, `SAR`).
 
-You will need Python 3.11. On Debian you may need:
-* `sudo add-apt-repository -y 'deb http://ppa.launchpad.net/deadsnakes/ppa/ubuntu focal main'` (or `jammy` in place of `focal` for later Debian)
-* `sudo apt update`
-* `sudo apt install python3.11 python3.11-venv`
+Each dataset configuration in `config.json` controls how the harvester interacts with the corresponding Airbus API. You can adjust:
+- **API endpoints and authentication**: Change the `url` and `auth_env` to point to different Airbus API environments or endpoints.
+- **Request parameters**: Modify the `body` and `request_method` to control how data is requested (e.g., filtering by constellation, pagination settings).
+- **STAC mapping**: Update `stac_properties_map` to map API response fields to STAC properties, or add new mappings as needed.
+- **External URLs**: Add or change entries in `external_urls` to include additional links or assets in the output STAC items, and control whether they are proxied.
+- **Extensions and metadata**: Specify which STAC extensions to include in the resulting items, and set collection-level metadata.
 
-and on Ubuntu you may need
-* `sudo add-apt-repository -y 'ppa:deadsnakes/ppa'`
-* `sudo apt update`
-* `sudo apt install python3.11 python3.11-venv`
+See `config_schema.json` for config structure.
 
-To prepare running it:
+**Environment Variables:**
+- `HARVESTER_CONFIG_KEY`: Selects the dataset config.
+- `AIRBUS_API_KEY`: Your Airbus API key.
+- `PULSAR_URL`: Pulsar broker URL.
+- `PROXY_BASE_URL`: Base URL for asset href redirects via a proxy.
+- `MINIMUM_MESSAGE_ENTRIES`: Minimum number of entries before sending a message (default: 100).
+- `MAX_API_RETRIES`: Maximum API retry attempts (default: 5).
+- `COMMERCIAL_CATALOGUE_ROOT`: Root path for catalogue storage (default: "commercial").
+- `TOPIC`: Optional append to the Pulsar output topic, used to separate large harvests such as this from more time-sensitive messages (default: None).
 
-* `virtualenv venv -p python3.11`
-* `. venv/bin/activate`
-* `rehash`
-* `python -m ensurepip -U`
-* `pip3 install -r requirements.txt`
-* `pip3 install -r requirements-dev.txt`
+## Usage
 
-You should also configure your IDE to use black so that code is automatically reformatted on save.
+Run the harvester from the command line:
 
-## Building and testing
-
-This component uses `pytest` tests and the `ruff` and `black` linters. `black` will reformat your code in an
-opinionated way.
-
-A number of `make` targets are defined:
-* `make test`: run tests continuously
-* `make testonce`: run tests once
-* `make lint`: lint and reformat
-* `make dockerbuild`: build a `latest` Docker image (use `make dockerbuild `VERSION=1.2.3` for a release image)
-* `make dockerpush`: push a `latest` Docker image (again, you can add `VERSION=1.2.3`) - normally this should be done
-  only via the build system and its GitHub actions.
-
-## Managing requirements
-
-Requirements are specified in `pyproject.toml`, with development requirements listed separately. Specify version
-constraints as necessary but not specific versions. After changing them:
-
-* Run `pip-compile` (or `pip-compile -U` to upgrade requirements within constraints) to regenerate `requirements.txt`
-* Run `pip-compile --extra dev -o requirements-dev.txt` (again, add `-U` to upgrade) to regenerate
-  `requirements-dev.txt`.
-* Run the `pip3 install -r requirements.txt` and `pip3 install -r requirements-dev.txt` commands again and test.
-* Commit these files.
-
-If you see the error
-
-```commandline
-Backend subprocess exited when trying to invoke get_requires_for_build_wheel
-Failed to parse /.../template-python/pyproject.toml
+```sh
+python -m airbus_harvester <workspace_name> <catalog> <s3_bucket>
 ```
 
-then install and run `validate-pyproject pyproject.toml` and/or `pip3 install .` to check its syntax.
+Example:
 
-To check for vulnerable dependencies, run `pip-audit`.
+```sh
+python -m airbus_harvester default_workspace catalog catalogue-population-eodhp
+```
 
-## Releasing
+- `catalog` is not used, it is included to preserve structure with other harvesters
+- `workspace_name` should be `default_workspace`, to harvest items into a public catalogue in the EODH.
 
-Ensure that `make lint` and `make test` work correctly and produce no further changes to code formatting before
-continuing.
+## Development
 
-Releases tagged `latest` and targeted at development environments can be created from the `main` branch. Releases for
-installation in non-development environments should be created from a Git tag named using semantic versioning. For
-example, using
+- Code is in `airbus_harvester`.
+- Formatting: [Black](https://black.readthedocs.io/), [Ruff](https://docs.astral.sh/ruff/), [isort](https://pycqa.github.io/isort/).
+- Linting: [Pylint](https://pylint.pycqa.org/).
+- Pre-commit checks are installed with `make setup`.
 
-* `git tag 1.2.3`
-* `git push --tags`
+Useful Makefile targets:
 
-Normally, Docker images will be built automatically after pushing to the UKEODHP repos. Images can also be created
-manually in the following way:
+- `make test`: Run tests continuously
+- `make testonce`: Run tests once
+- `make lint`: Lint and reformat code
+- `make dockerbuild`: Build a Docker image
+- `make dockerpush`: Push a Docker image
 
-* For versioned images create a git tag.
-* Log in to the Docker repository service. For the UKEODHP environment this can be achieved with the following command
-  ```AWS_ACCESS_KEY_ID=...  AWS_SECRET_ACCESS_KEY=... aws ecr get-login-password --region eu-north-1 | docker login --username AWS --password-stdin 312280911266.dkr.ecr.eu-west-2.amazonaws.com```
-  You will need to create an access key for a user with permission to modify ECR first.
-* Run `make dockerbuild` (for images tagged `latest`) or `make dockerbuild VERSION=1.2.3` for a release tagged `1.2.3`.
-  The image will be available locally within Docker after this step.
-* Run `make dockerpush` or `make dockerpush VERSION=1.2.3`. This will send the image to the ECR repository.
+
+## Testing
+
+Run all tests with:
+
+```sh
+make testonce
+```
+
+Tests use [pytest](https://docs.pytest.org/), [moto](https://github.com/spulec/moto) for AWS mocking, and [requests-mock](https://requests-mock.readthedocs.io/).
+
+## Troubleshooting
+
+- **Authentication errors:** Check your `AIRBUS_API_KEY` and AWS credentials.
+- **Pulsar connection issues:** Ensure `PULSAR_URL` is set and reachable.
+- **S3 upload failures:** Verify bucket permissions and region.
+- **API rate limits:** Adjust `MAX_API_RETRIES` as needed.
+
+Check logs for detailed error messages.
+
+
+## Release Process
+
+The release process is fully automated and handled through GitHub Actions.  
+On every push to `main` or when a new tag is created, the following checks and steps are run automatically:
+
+- Pre-commit checks and linting
+- Security scanning
+- Unit tests
+- Docker image build and push to the configured registry
+
+Versioned releases are handled through the Releases page in github.
+
+See [`.github/workflows/actions.yaml`](.github/workflows/actions.yaml) for details.
+
+## License
+
+This project is licensed under the United Kingdom Research and Innovation BSD Licence. See LICENSE for details.
