@@ -1,5 +1,8 @@
 # Changelog
 
+# v0.1.19 (2025/06/05)
+- Fix incorrect coordinates 
+
 # 0.1.18 (2025/05/29)
 - Remove extra `Z`s from temporal intervals
 
