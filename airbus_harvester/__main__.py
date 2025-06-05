@@ -179,7 +179,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
                     harvested_data[key] = data
                     latest_harvested[key] = file_hash
                 else:
-                    # logging.info(f"Skipping: {key}")
+                    logging.info(f"Skipping: {key}")
             except KeyError:
                 logging.error(f"Invalid entry in {next_url}")
 
