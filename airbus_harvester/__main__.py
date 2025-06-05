@@ -18,7 +18,7 @@ from inflection import underscore
 from pulsar import ConnectError
 from requests.exceptions import ConnectionError, HTTPError, Timeout
 
-from airbus_harvesster.airbus_harvester_messager import AirbusHarvesterMessager
+from airbus_harvester.airbus_harvester_messager import AirbusHarvesterMessager
 
 setup_logging(verbosity=2)  # DEBUG level
 
