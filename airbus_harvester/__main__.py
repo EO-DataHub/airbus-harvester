@@ -18,7 +18,7 @@ from inflection import underscore
 from pulsar import ConnectError
 from requests.exceptions import ConnectionError, HTTPError, Timeout
 
-from airbus_harvester_messager import AirbusHarvesterMessager
+from airbus_harvesster.airbus_harvester_messager import AirbusHarvesterMessager
 
 setup_logging(verbosity=2)  # DEBUG level
 
@@ -70,14 +70,13 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     def get_pulsar_producer(retry_count: int = 0):
         """Initialise pulsar producer. Retry if connection fails"""
         try:
-            2
-            # pulsar_client = get_pulsar_client()
-            # producer = pulsar_client.create_producer(
-            #     topic=f"harvested{identifier}",
-            #     producer_name=f"stac_harvester/airbus/{config['collection_name']}_{uuid.uuid1().hex}",
-            #     chunking_enabled=True,
-            # )
-            # return producer
+            pulsar_client = get_pulsar_client()
+            producer = pulsar_client.create_producer(
+                topic=f"harvested{identifier}",
+                producer_name=f"stac_harvester/airbus/{config['collection_name']}_{uuid.uuid1().hex}",
+                chunking_enabled=True,
+            )
+            return producer
         except ConnectError as e:
             logging.error(f"Failed to connect to pulsar: {e}")
             if retry_count >= 10:
@@ -88,7 +87,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
             time.sleep(2**retry_count)
             return get_pulsar_producer(retry_count=retry_count + 1)
 
-    # producer = get_pulsar_producer()
+    producer = get_pulsar_producer()
 
     s3_root = "git-harvester/"
 
@@ -99,7 +98,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         s3_client=s3_client,
         output_bucket=s3_bucket,
         cat_output_prefix=s3_root,
-        producer=2#producer,
+        producer=producer,
     )
 
     harvested_data = {}
@@ -217,7 +216,6 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         # Use old summary if it exists - likely to be more accurate during harvest
         if is_first_harvest:
             summary = get_stac_collection_summary(catalogue_data_summary)
-
         else:
             summary = get_stac_collection_summary(old_catalogue_data_summary)
 
@@ -358,8 +356,6 @@ def simplify_catalogue_data_summary(all_data: dict) -> dict:
             smallest_long = coordinates
 
     coordinates_summary = [biggest_lat, biggest_long, smallest_lat, smallest_long]
-
-    logging.info(coordinates_summary)
 
     return {
         "coordinates": coordinates_summary,
