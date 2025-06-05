@@ -140,7 +140,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         stop_time = old_collection_data["extent"]["temporal"]["interval"][0][1].split(".")[0]
 
         bbox = old_collection_data["extent"]["spatial"]["bbox"][0]
-        coordinates = [[bbox[1], bbox[0]], [bbox[3], bbox[2]]]
+        coordinates = [[bbox[0], bbox[1]], [bbox[2], bbox[3]]]
 
         old_catalogue_data_summary = {
             "start_time": [f"{start_time.rstrip("Z")}Z"],
