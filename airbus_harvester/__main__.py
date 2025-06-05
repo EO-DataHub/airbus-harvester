@@ -350,15 +350,15 @@ def simplify_catalogue_data_summary(all_data: dict) -> dict:
     logging.info('1111111111111111111')
 
     for coordinates in all_data["coordinates"]:
-        logging.info(coordinates)
+        # logging.info(coordinates)
         if coordinates[0] > biggest_lat[0]:
-            biggest_lat = coordinates
+            biggest_lat = coordinates[0]
         elif coordinates[0] < smallest_lat[0]:
-            smallest_lat = coordinates
+            smallest_lat = coordinates[0]
         elif coordinates[1] > biggest_long[1]:
-            biggest_long = coordinates
+            biggest_long = coordinates[1]
         elif coordinates[1] < smallest_long[1]:
-            smallest_long = coordinates
+            smallest_long = coordinates[1]
 
     coordinates_summary = [biggest_lat, biggest_long, smallest_lat, smallest_long]
 
