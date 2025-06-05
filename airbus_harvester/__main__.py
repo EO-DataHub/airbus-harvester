@@ -175,7 +175,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
 
                 if not previous_hash or previous_hash != file_hash:
                     # Data was not harvested previously
-                    logging.info(f"Added: {key}")
+                    # logging.info(f"Added: {key}")
                     harvested_data[key] = data
                     latest_harvested[key] = file_hash
                 else:
@@ -216,8 +216,10 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         # Use old summary if it exists - likely to be more accurate during harvest
         if is_first_harvest:
             summary = get_stac_collection_summary(catalogue_data_summary)
+            logging.info('FFFFFFFFFFFFFFFF')
         else:
             summary = get_stac_collection_summary(old_catalogue_data_summary)
+            logging.info('NNNNNNNNNNNNNNN')
 
         # Collection updates every loop so that start/stop times and bbox values are the latest
         # ones from the Airbus catalogue
@@ -231,7 +233,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         # Make sure collection level is sent during first message. Only send changes after that
         if url_count == 1 or (not previous_hash or previous_hash != file_hash):
             # Data was not harvested previously
-            logging.info(f"Added: {collection_key}")
+            # logging.info(f"Added: {collection_key}")
             harvested_data[collection_key] = collection_data
             latest_harvested[collection_key] = file_hash
 
@@ -248,9 +250,9 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
             for key, value in latest_harvested.items():
                 current_harvest_metadata[key] = value
 
-            logging.info(f"Sending message with {len(harvested_data.keys())} entries")
+            # logging.info(f"Sending message with {len(harvested_data.keys())} entries")
             airbus_harvester_messager.consume(msg)
-            logging.info(f"Uploading metadata to S3: {len(current_harvest_metadata)} items")
+            # logging.info(f"Uploading metadata to S3: {len(current_harvest_metadata)} items")
             upload_file_s3(
                 json.dumps(current_harvest_metadata), s3_bucket, metadata_s3_key, s3_client
             )
@@ -315,13 +317,13 @@ def compare_to_previous_version(
 
     if not previous_hash:
         # URL was not harvested previously
-        logging.info(f"Added: {key}")
-        harvested_keys["added_keys"].add(key)
+        # logging.info(f"Added: {key}")
+        # harvested_keys["added_keys"].add(key)
         upload_file_s3(data, s3_bucket, key, s3_client)
     elif previous_hash != file_hash:
         # URL has changed since last run
-        logging.info(f"Updated: {key}")
-        harvested_keys["updated_keys"].add(key)
+        # logging.info(f"Updated: {key}")
+        # harvested_keys["updated_keys"].add(key)
         upload_file_s3(data, s3_bucket, key, s3_client)
 
     return harvested_keys, file_hash
@@ -345,17 +347,22 @@ def simplify_catalogue_data_summary(all_data: dict) -> dict:
 
     biggest_lat = smallest_lat = biggest_long = smallest_long = all_data["coordinates"][0]
 
+    logging.info('1111111111111111111')
+
     for coordinates in all_data["coordinates"]:
+        # logging.info(coordinates)
         if coordinates[0] > biggest_lat[0]:
-            biggest_lat = coordinates
+            biggest_lat = coordinates[0]
         elif coordinates[0] < smallest_lat[0]:
-            smallest_lat = coordinates
+            smallest_lat = coordinates[0]
         elif coordinates[1] > biggest_long[1]:
-            biggest_long = coordinates
+            biggest_long = coordinates[1]
         elif coordinates[1] < smallest_long[1]:
-            smallest_long = coordinates
+            smallest_long = coordinates[1]
 
     coordinates_summary = [biggest_lat, biggest_long, smallest_lat, smallest_long]
+
+    logging.info(coordinates_summary)
 
     return {
         "coordinates": coordinates_summary,
@@ -478,6 +485,9 @@ def get_stac_collection_summary(all_data: dict) -> dict:
 
     bbox = coordinates_to_bbox(all_data["coordinates"])
 
+    logging.info('222222222222')
+    logging.info(bbox)
+
     return {
         "bbox": bbox,
         "start_time": min(all_data["start_time"]),
@@ -565,7 +575,7 @@ def modify_value(key, value) -> str:
 def generate_stac_item(data: dict, config: dict) -> dict:
     """Catalogue items for Airbus data"""
     item_id = data["properties"][config["item_id_key"]]
-    logging.info(f"Processing item {item_id}")
+    # logging.info(f"Processing item {item_id}")
 
     coordinates = data["geometry"]["coordinates"][0]
     bbox = coordinates_to_bbox(coordinates)
