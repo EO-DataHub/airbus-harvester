@@ -346,14 +346,24 @@ def simplify_catalogue_data_summary(all_data: dict) -> dict:
     biggest_lat = smallest_lat = biggest_long = smallest_long = all_data["coordinates"][0]
 
     for coordinates in all_data["coordinates"]:
-        if coordinates[0] > biggest_lat[0]:
-            biggest_lat = coordinates
-        elif coordinates[0] < smallest_lat[0]:
-            smallest_lat = coordinates
-        if coordinates[1] > biggest_long[1]:
+        # Clip to -90<lat<90 and <-180<long<180 if outside standard range
+        if coordinates[0] > 180:
+            coordinates[0] = 180
+        elif coordinates[0] < -180:
+            coordinates[0] = -180
+        if coordinates[1] > 90:
+            coordinates[1] = 90
+        elif coordinates[1] < -90:
+            coordinates[1] = -90
+
+        if coordinates[0] > biggest_long[0]:
             biggest_long = coordinates
-        elif coordinates[1] < smallest_long[1]:
+        elif coordinates[0] < smallest_long[0]:
             smallest_long = coordinates
+        if coordinates[1] > biggest_lat[1]:
+            biggest_lat = coordinates
+        elif coordinates[1] < smallest_lat[1]:
+            smallest_lat = coordinates
 
     coordinates_summary = [biggest_lat, biggest_long, smallest_lat, smallest_long]
 
