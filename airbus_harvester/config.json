@@ -50,7 +50,7 @@
             "constellation": "SPOT",
             "processingLevel": "ALBUM",
             "workspace": "public",
-            "index":"all"
+            "index": "all"
         },
         "request_method": "POST",
         "stac_properties": {
@@ -68,7 +68,6 @@
             "view:sun_azimuth": "illuminationAzimuthAngle",
             "view:sun_elevation": "illuminationElevationAngle",
             "view:incidence_angle": "incidenceAngle"
-
         },
         "external_urls": [
             {
@@ -82,7 +81,6 @@
         ],
         "stac_extensions": [
             "https://stac-extensions.github.io/eo/v2.0.0/schema.json",
-            "https://stac-extensions.github.io/sat/v1.0.0/schema.json",
             "https://stac-extensions.github.io/view/v1.0.0/schema.json"
         ],
         "item_id_key": "acquisitionIdentifier",
@@ -99,7 +97,7 @@
             "constellation": "PHR",
             "processingLevel": "ALBUM",
             "workspace": "public",
-            "index":"all"
+            "index": "all"
         },
         "request_method": "POST",
         "stac_properties": {
@@ -117,7 +115,6 @@
             "view:sun_azimuth": "illuminationAzimuthAngle",
             "view:sun_elevation": "illuminationElevationAngle",
             "view:incidence_angle": "incidenceAngle"
-
         },
         "external_urls": [
             {
@@ -131,7 +128,6 @@
         ],
         "stac_extensions": [
             "https://stac-extensions.github.io/eo/v2.0.0/schema.json",
-            "https://stac-extensions.github.io/sat/v1.0.0/schema.json",
             "https://stac-extensions.github.io/view/v1.0.0/schema.json"
         ],
         "item_id_key": "acquisitionIdentifier",
@@ -148,7 +144,7 @@
             "startPage": 1,
             "processingLevel": "ALBUM",
             "workspace": "public-pneo",
-            "index":"all"
+            "index": "all"
         },
         "request_method": "POST",
         "stac_properties": {
@@ -166,7 +162,6 @@
             "view:sun_azimuth": "illuminationAzimuthAngle",
             "view:sun_elevation": "illuminationElevationAngle",
             "view:incidence_angle": "incidenceAngle"
-
         },
         "external_urls": [
             {
@@ -182,7 +177,6 @@
         ],
         "stac_extensions": [
             "https://stac-extensions.github.io/eo/v2.0.0/schema.json",
-            "https://stac-extensions.github.io/sat/v1.0.0/schema.json",
             "https://stac-extensions.github.io/view/v1.0.0/schema.json"
         ],
         "item_id_key": "acquisitionIdentifier",
