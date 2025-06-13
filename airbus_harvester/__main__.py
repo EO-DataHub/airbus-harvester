@@ -140,7 +140,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         stop_time = old_collection_data["extent"]["temporal"]["interval"][0][1].split(".")[0]
 
         bbox = old_collection_data["extent"]["spatial"]["bbox"][0]
-        coordinates = [[bbox[1], bbox[0]], [bbox[3], bbox[2]]]
+        coordinates = [[bbox[0], bbox[1]], [bbox[2], bbox[3]]]
 
         old_catalogue_data_summary = {
             "start_time": [f"{start_time.rstrip("Z")}Z"],
@@ -346,14 +346,24 @@ def simplify_catalogue_data_summary(all_data: dict) -> dict:
     biggest_lat = smallest_lat = biggest_long = smallest_long = all_data["coordinates"][0]
 
     for coordinates in all_data["coordinates"]:
-        if coordinates[0] > biggest_lat[0]:
-            biggest_lat = coordinates
-        elif coordinates[0] < smallest_lat[0]:
-            smallest_lat = coordinates
-        elif coordinates[1] > biggest_long[1]:
+        # Clip to -90<lat<90 and <-180<long<180 if outside standard range
+        if coordinates[0] > 180:
+            coordinates[0] = 180
+        elif coordinates[0] < -180:
+            coordinates[0] = -180
+        if coordinates[1] > 90:
+            coordinates[1] = 90
+        elif coordinates[1] < -90:
+            coordinates[1] = -90
+
+        if coordinates[0] > biggest_long[0]:
             biggest_long = coordinates
-        elif coordinates[1] < smallest_long[1]:
+        elif coordinates[0] < smallest_long[0]:
             smallest_long = coordinates
+        if coordinates[1] > biggest_lat[1]:
+            biggest_lat = coordinates
+        elif coordinates[1] < smallest_lat[1]:
+            smallest_lat = coordinates
 
     coordinates_summary = [biggest_lat, biggest_long, smallest_lat, smallest_long]
 
