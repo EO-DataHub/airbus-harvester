@@ -1,138 +1,99 @@
 [project]
-name = "Airbus-Harvester"
+name = "airbus-harvester"
 version = "0.1.4"
 description = "Harvest Airbus data"
 readme = "README.md"
-
-requires-python = ">=3.12"
-
+requires-python = ">=3.13,<3.14"
 license = {file = "LICENSE"}
-
 authors = [
-  {name = "Telespazio UK Ltd", email = "hannah.collingwood@telespazio.com" }
+  {name = "Telespazio UK Ltd", email = "hannah.collingwood@telespazio.com"}
 ]
-
 maintainers = [
-  {name = "Telespazio UK Ltd", email = "hannah.collingwood@telespazio.com" }
+  {name = "Telespazio UK Ltd", email = "hannah.collingwood@telespazio.com"}
 ]
-
-# Classifiers help users find your project by categorizing it.
-#
-# For a list of valid classifiers, see https://pypi.org/classifiers/
 classifiers = [
-  # How mature is this project? Common values are
-  #   3 - Alpha
-  #   4 - Beta
-  #   5 - Production/Stable
   "Development Status :: 5 - Production/Stable",
-
-  # Indicate who your project is intended for
   "Intended Audience :: Science/Research",
   "Intended Audience :: Developers",
-
   "License :: OSI Approved :: BSD License",
-
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3 :: Only",
 ]
-
-# This field lists other packages that your project depends on to run.
-# Any package you put here will be installed by pip when your project is
-# installed, so they must be valid existing projects.
-#
-# For an analysis of this field vs pip's requirements files see:
-# https://packaging.python.org/discussions/install-requires-vs-requirements/
 dependencies = [
-    "pulsar-client",
     "boto3",
     "botocore",
     "click",
-    "pystac-client",
-    "pystac",
+    "eodhp-utils",
     "inflection",
-    "eodhp-utils @ git+https://github.com/EO-DataHub/eodhp-utils.git@v0.1.4",
+    "pulsar-client",
+    "pystac",
+    "pystac-client",
+    "requests",
 ]
 
-# List additional groups of dependencies here (e.g. development
-# dependencies). Users will be able to install these using the "extras"
-# syntax, for example:
-#
-#   $ pip install sampleproject[dev]
-#
-# Similar to `dependencies` above, these must be valid existing
-# projects.
-[project.optional-dependencies] # Optional
-dev = ["pip-tools", "pytest", "pytest-xdist", "pytest-mock", "pytest-watcher", "black", "ruff", "isort", "pre-commit", "requests-mock", "moto"]
+[dependency-groups]
+dev = [
+    "moto",
+    "pre-commit",
+    "pyright",
+    "pytest",
+    "pytest-mock",
+    "pytest-watcher",
+    "pytest-xdist",
+    "requests-mock",
+    "ruff",
+    "validate-pyproject",
+]
 
-# List URLs that are relevant to your project
-#
-# This field corresponds to the "Project-URL" and "Home-Page" metadata fields:
-# https://packaging.python.org/specifications/core-metadata/#project-url-multiple-use
-# https://packaging.python.org/specifications/core-metadata/#home-page-optional
-#
-# Examples listed include a pattern for specifying where the package tracks
-# issues, where the source is hosted, where to say thanks to the package
-# maintainers, and where to support the project financially. The key is
-# what's used to render the link text on PyPI.
-[project.urls]  # Optional
-homepage = "https://github.com/EO-Datahub/"
-repository = "https://github.com/EO-Datahub/airbus-harvester"
-changelog = "https://github.com/EO-Datahub/airbus-harvester/blob/main/CHANGELOG.md"
+[project.urls]
+homepage = "https://github.com/EO-DataHub/"
+repository = "https://github.com/EO-DataHub/airbus-harvester"
+changelog = "https://github.com/EO-DataHub/airbus-harvester/blob/main/CHANGELOG.md"
 
 [build-system]
-# These are the assumed default build requirements from pip:
-# https://pip.pypa.io/en/stable/reference/pip/#pep-517-and-518-support
-requires = ["setuptools>=69.0.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["airbus_harvester"]
+
+[tool.uv]
+package = true
+
+[tool.uv.sources]
+eodhp-utils = { git = "https://github.com/EO-DataHub/eodhp-utils.git", tag = "v0.1.4" }
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
+addopts = ["--import-mode=importlib"]
 markers = [
   "integrationtest: Integration test"
 ]
 
-[tool.setuptools]
-packages = []
-
-[tool.black]
-line-length = 100
-target-version = ['py312']
-
 [tool.ruff]
-line-length = 110
-target-version = "py312"
-select = ["E", "F", "B", "W"]
+line-length = 119
 
-exclude = [
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".git-rewrite",
-    ".hg",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "venv",
+[tool.ruff.lint]
+select = [
+    "E",    # Pycodestyle errors
+    "W",    # Pycodestyle warnings
+    "F",    # Pyflakes
+    "I",    # isort
+    "FAST", # FastAPI
+    "RUF",  # RUF-specific rules
+    "SIM",  # Simplifications
+    "B",    # Bugbear
+    "ANN",  # Annotations
+    "PLC",  # Pylint convention
+    "PLE",  # Pylint errors
+    "UP",   # pyupgrade
+    "FURB", # refurb
+    "PT",   # pytest
 ]
-
-[tool.pylint.'MESSAGES CONTROL']
-disable = '''
-    line-too-long,
-    missing-class-docstring, 
-    too-many-locals, 
-    too-many-instance-attributes,
-    logging-fstring-interpolation,
-'''
+ignore = [
+    "E501",   # line too long
+    "SIM108", # ternary operator
+    "SIM103", # return bool directly
+    "B008",   # function call in default argument (incompatible with FastAPI)
+    "ANN401", # dynamically typed expressions (Any) are disallowed
+]

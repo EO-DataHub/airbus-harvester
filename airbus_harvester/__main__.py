@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import hashlib
 import json
@@ -7,9 +9,8 @@ import time
 import traceback
 import uuid
 from json import JSONDecodeError
-from typing import Optional
+from typing import Any
 
-import boto3
 import click
 import requests
 from eodhp_utils.aws.s3 import get_file_s3, upload_file_s3
@@ -30,29 +31,26 @@ max_api_retries = int(os.environ.get("MAX_API_RETRIES", 5))
 commercial_catalogue_root = os.getenv("COMMERCIAL_CATALOGUE_ROOT", "commercial")
 
 
-def load_config(config_path):
-    with open(config_path, "r") as f:
+def load_config(config_path: str) -> Any:
+    with open(config_path) as f:
         return json.load(f)
 
 
 @click.group()
 # you can implement any global flags here that will apply to all commands, e.g. debug
 # @click.option('--debug/--no-debug', default=False) # don't feel the need to implement this, just an example
-def cli():
+def cli() -> None:
     """This is just a placeholder to act as the entrypoint, you can do things with global options here
     if required"""
-    pass
 
 
 @cli.command()
 # not currently used but keeping the same structure as the other harvester repos
 # @click.argument("source_url", type=str, nargs=1)
 @click.argument("workspace_name", type=str)
-@click.argument(
-    "catalog", type=str
-)  # not currently used but keeping the same structure as the other harvester repos
+@click.argument("catalog", type=str)  # not currently used but keeping the same structure as the other harvester repos
 @click.argument("s3_bucket", type=str)
-def harvest(workspace_name: str, catalog: str, s3_bucket: str):
+def harvest(workspace_name: str, catalog: str, s3_bucket: str) -> None:
     """Harvest a given Airbus catalog, and all records beneath it. Send a pulsar message
     containing all added, updated, and deleted links since the last time the catalog was
     harvested"""
@@ -62,12 +60,10 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     config_key = os.getenv("HARVESTER_CONFIG_KEY", "")
     config = load_config("airbus_harvester/config.json").get(config_key.upper())
 
-    if os.getenv("TOPIC"):
-        identifier = "_" + os.getenv("TOPIC")
-    else:
-        identifier = ""
+    topic = os.getenv("TOPIC")
+    identifier = f"_{topic}" if topic else ""
 
-    def get_pulsar_producer(retry_count: int = 0):
+    def get_pulsar_producer(retry_count: int = 0) -> Any:
         """Initialise pulsar producer. Retry if connection fails"""
         try:
             pulsar_client = get_pulsar_client()
@@ -129,10 +125,9 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     current_harvest_keys.add(collection_key)
 
     is_first_harvest = True
+    old_catalogue_data_summary: dict = {"start_time": [], "stop_time": [], "coordinates": []}
     old_collection_data = get_file_data(s3_bucket, f"{s3_root}{collection_key}", s3_client)
-    logging.info(
-        f"Found previous collection data in {s3_bucket}: {collection_key}, {old_collection_data}"
-    )
+    logging.info(f"Found previous collection data in {s3_bucket}: {collection_key}, {old_collection_data}")
 
     if old_collection_data:
         is_first_harvest = False
@@ -143,8 +138,8 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         coordinates = [[bbox[0], bbox[1]], [bbox[2], bbox[3]]]
 
         old_catalogue_data_summary = {
-            "start_time": [f"{start_time.rstrip("Z")}Z"],
-            "stop_time": [f"{stop_time.rstrip("Z")}Z"],
+            "start_time": [f"{start_time.rstrip('Z')}Z"],
+            "stop_time": [f"{stop_time.rstrip('Z')}Z"],
             "coordinates": coordinates,
         }
         logging.info(f"Previous harvest data recovered: {old_catalogue_data_summary}")
@@ -163,6 +158,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         features = body.get("features", [])
         logging.info(f"Page {url_count} features: {len(features)}")
 
+        entry: dict = {}
         for entry in features:
             data = generate_stac_item(entry, config)
             try:
@@ -186,29 +182,28 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
             # Update both summaries (if an old one does exist)
             catalogue_data_summary = add_to_catalogue_data_summary(catalogue_data_summary, data)
             if not is_first_harvest:
-                old_catalogue_data_summary = add_to_catalogue_data_summary(
-                    old_catalogue_data_summary, data
-                )
+                old_catalogue_data_summary = add_to_catalogue_data_summary(old_catalogue_data_summary, data)
 
         catalogue_data_summary = simplify_catalogue_data_summary(catalogue_data_summary)
         if not is_first_harvest:
             old_catalogue_data_summary = simplify_catalogue_data_summary(old_catalogue_data_summary)
 
         if config["pagination_method"] == "link":
-            try:
-                next_url = body.get("_links").get("next")
-            except AttributeError as e:
-                logging.error(e)
-                raise
+            links = body.get("_links")
+            if links is None:
+                msg_text = f"Missing '_links' in response from {next_url}"
+                logging.error(msg_text)
+                raise AttributeError(msg_text)
+            next_url = links.get("next")
         elif config["pagination_method"] == "counter":
             if not features:
                 next_url = None
             else:
                 # The counter can only go up to 50. Limit the search by last update date
                 if (url_count + 1) % 50 == 0:
-                    config["body"][
-                        "lastUpdateDate"
-                    ] = f"[2018-10-03T12:00:00Z,{entry['properties']['lastUpdateDate']}]"
+                    config["body"]["lastUpdateDate"] = (
+                        f"[2018-10-03T12:00:00Z,{entry['properties']['lastUpdateDate']}]"
+                    )
                 config["body"]["startPage"] = (url_count % 50) + 1
 
         logging.info(f"Page {url_count} next URL: {next_url}")
@@ -223,9 +218,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         # ones from the Airbus catalogue
         collection_data = generate_stac_collection(summary, config)
         last_run_hash = latest_harvested.get(collection_key)
-        previous_hash = (
-            last_run_hash if last_run_hash else current_harvest_metadata.get(collection_key)
-        )
+        previous_hash = last_run_hash or current_harvest_metadata.get(collection_key)
 
         file_hash = get_file_hash(json.dumps(collection_data))
         # Make sure collection level is sent during first message. Only send changes after that
@@ -238,7 +231,6 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
         latest_harvested["summary"] = catalogue_data_summary
 
         if len(harvested_data.keys()) >= minimum_message_entries:
-
             # Send message for altered keys
             msg = {
                 "harvested_data": harvested_data,
@@ -251,9 +243,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
             logging.info(f"Sending message with {len(harvested_data.keys())} entries")
             airbus_harvester_messager.consume(msg)
             logging.info(f"Uploading metadata to S3: {len(current_harvest_metadata)} items")
-            upload_file_s3(
-                json.dumps(current_harvest_metadata), s3_bucket, metadata_s3_key, s3_client
-            )
+            upload_file_s3(json.dumps(current_harvest_metadata), s3_bucket, metadata_s3_key, s3_client)
             logging.info("Uploaded metadata to S3")
             harvested_data = {}
             latest_harvested = {}
@@ -276,9 +266,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     # Compare items harvested this run to the ones harvested in the previous run to find deletions
     deleted_keys = find_deleted_keys(current_harvest_keys, previous_harvest_metadata)
 
-    logging.info(
-        f"Removing {len(deleted_keys)} deleted keys: {len(current_harvest_metadata)} items"
-    )
+    logging.info(f"Removing {len(deleted_keys)} deleted keys: {len(current_harvest_metadata)} items")
     for key in deleted_keys:
         del current_harvest_metadata[key]
     logging.info(f"Deleted keys removed: {len(current_harvest_metadata)} items")
@@ -286,9 +274,7 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str):
     # Send message for altered keys
     msg = {"harvested_data": harvested_data, "deleted_keys": deleted_keys}
 
-    logging.info(
-        f"Sending message with {len(harvested_data.keys())} entries and {len(deleted_keys)} deleted keys"
-    )
+    logging.info(f"Sending message with {len(harvested_data.keys())} entries and {len(deleted_keys)} deleted keys")
     airbus_harvester_messager.consume(msg)
 
     logging.info(f"Uploading metadata to S3: {len(current_harvest_metadata)} items")
@@ -307,7 +293,7 @@ def compare_to_previous_version(
     previous_hash: str,
     harvested_keys: dict,
     s3_bucket: str,
-    s3_client: boto3.session.Session.client,
+    s3_client: Any,
 ) -> tuple:
     """Compares a file to a previous version of a file as determined by the hash. New or updated
     files are uploaded to S3"""
@@ -330,12 +316,8 @@ def compare_to_previous_version(
 def add_to_catalogue_data_summary(all_data: dict, data: dict) -> dict:
     """Combines new data with existing data for whole catalogue"""
     all_data["coordinates"] += data["geometry"]["coordinates"][0]
-    all_data["start_time"].append(
-        data["properties"].get("start_datetime", data["properties"].get("datetime"))
-    )
-    all_data["stop_time"].append(
-        data["properties"].get("end_datetime", data["properties"].get("datetime"))
-    )
+    all_data["start_time"].append(data["properties"].get("start_datetime", data["properties"].get("datetime")))
+    all_data["stop_time"].append(data["properties"].get("end_datetime", data["properties"].get("datetime")))
 
     return all_data
 
@@ -426,9 +408,7 @@ def get_next_page(url: str, config: dict, retry_count: int = 0) -> dict:
             access_token = generate_access_token(config["auth_env"])
             headers["Authorization"] = "Bearer " + access_token
 
-        logging.info(
-            f"Making {config['request_method'].upper()} request to {url} with body {config['body']}"
-        )
+        logging.info(f"Making {config['request_method'].upper()} request to {url} with body {config['body']}")
         if config["request_method"].upper() == "POST":
             response = requests.post(url, json=config["body"], headers=headers, timeout=10)
         else:
@@ -462,7 +442,7 @@ def get_file_hash(data: str) -> str:
     return _md5_hash(data.encode("utf-8"))
 
 
-def get_file_data(bucket: str, key: str, s3_client: boto3.client) -> dict:
+def get_file_data(bucket: str, key: str, s3_client: Any) -> dict:
     """Read file at given S3 location and parse as JSON"""
     previously_harvested = get_file_s3(bucket, key, s3_client)
     try:
@@ -517,8 +497,8 @@ def handle_external_url(
     mapped_keys: set,
     name: str,
     path: str,
-    proxy: Optional[str] = None,
-):
+    proxy: str | None = None,
+) -> None:
     """Convert external URL to link and asset"""
     mime_types = {
         ".tiff": "image/tiff; application=geotiff; profile=cloud-optimized",
@@ -528,10 +508,10 @@ def handle_external_url(
         ".png": "image/png",
     }
 
-    keys = path.split(".")
+    path_keys = path.split(".")
     value = data
-    for key in keys:
-        value = value.get(key)
+    for path_key in path_keys:
+        value = value.get(path_key)
         if value is None:
             break
     external_url = value if isinstance(value, str) else None
@@ -540,7 +520,7 @@ def handle_external_url(
         file_extension = os.path.splitext(external_url)[1].lower()
         mime_type = mime_types.get(file_extension, "application/octet-stream")
 
-        def add_asset(rel_name, href):
+        def add_asset(rel_name: str, href: str) -> None:
             assets[rel_name] = {"href": href, "type": mime_type}
 
         if proxy:
@@ -549,10 +529,10 @@ def handle_external_url(
             add_asset(name, proxy_url)
         else:
             add_asset(name, external_url)
-        mapped_keys.add(key)
+        mapped_keys.add(path_keys[-1])
 
 
-def modify_value(key, value) -> str:
+def modify_value(key: str, value: Any) -> Any:
     """Modify a specific value to STAC format depending on the key"""
     if key == "lookDirection":
         # Convert look direction to human readable format
@@ -561,10 +541,10 @@ def modify_value(key, value) -> str:
         # Split dual polarisation channels into separate values
         return [value[i : i + 2] for i in range(0, len(value), 2)]
     elif key == "geometry_centroid":
-        if type(value) is dict:
+        if isinstance(value, dict):
             return value
         # Convert list to dict for consistency throughout the catalogue
-        if type(value) is list and len(value) == 2:
+        if isinstance(value, list) and len(value) == 2:
             return {"lat": value[1], "lon": value[0]}
         # Type not understood - ignore it
         return None
@@ -598,9 +578,7 @@ def generate_stac_item(data: dict, config: dict) -> dict:
                 f"{proxy_base_url}/api/catalogue/stac/{commercial_catalogue_root}/catalogs/airbus/"
                 f"collections/{config['collection_name']}/items/{item_id}"
             )
-        handle_external_url(
-            data, links, assets, mapped_keys, url_config["name"], url_config["path"], proxy_url
-        )
+        handle_external_url(data, links, assets, mapped_keys, url_config["name"], url_config["path"], proxy_url)
 
     for key, value in data["properties"].items():
         if key not in mapped_keys and value not in [None, ""]:

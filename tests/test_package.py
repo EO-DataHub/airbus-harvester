@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import json
 import os
 import tempfile
+from typing import Any
 from unittest import mock
 from unittest.mock import patch
 
@@ -24,7 +27,7 @@ from airbus_harvester.__main__ import (
 
 
 @pytest.fixture(autouse=True)
-def setenvvar(monkeypatch):
+def setenvvar(monkeypatch: pytest.MonkeyPatch) -> Any:
     with mock.patch.dict(os.environ, clear=True):
         envvars = {
             "AIRBUS_API_KEY": "41rbu5-4p1-k3y",
@@ -46,7 +49,7 @@ def parameters() -> dict:
 
 
 @pytest.fixture
-def mock_catalogue_response():
+def mock_catalogue_response() -> dict:
     return {
         "type": "FeatureCollection",
         "features": [
@@ -98,7 +101,7 @@ def mock_catalogue_response():
 
 
 @pytest.fixture
-def mock_response():
+def mock_response() -> dict:
     return {
         "limit": 1,
         "total": 566933,
@@ -159,7 +162,7 @@ def mock_response():
 
 
 @pytest.fixture
-def mock_data():
+def mock_data() -> dict:
     return {
         "coordinates": [[-27.9837603, 38.6070725]],
         "start_time": ["2024-01-22T19:42:44.735Z"],
@@ -168,7 +171,7 @@ def mock_data():
 
 
 @pytest.fixture
-def mock_config():
+def mock_config() -> dict:
     return {
         "collection_name": "airbus_sar_data",
         "url": "https://sar.api.oneatlas.airbus.com/v1/sar/catalogue/replication",
@@ -205,7 +208,7 @@ def mock_config():
 
 @moto.mock_aws
 @patch("airbus_harvester.__main__.get_pulsar_client")
-def test_harvest(mock_create_client, requests_mock, mock_catalogue_response):
+def test_harvest(mock_create_client: Any, requests_mock: Any, mock_catalogue_response: dict) -> None:
     requests_mock.get(
         "https://sar.api.oneatlas.airbus.com/v1/sar/catalogue/replication",
         text=json.dumps(mock_catalogue_response),
@@ -222,8 +225,8 @@ def test_harvest(mock_create_client, requests_mock, mock_catalogue_response):
 
     bucket_name = "my-bucket"
 
-    s3 = boto3.resource("s3", region_name="us-east-1")
-    s3.create_bucket(Bucket=bucket_name)
+    s3_resource: Any = boto3.resource("s3", region_name="us-east-1")
+    s3_resource.create_bucket(Bucket=bucket_name)
 
     os.environ["PULSAR_URL"] = "mypulsar.com/pulsar"
     os.environ["HARVESTER_CONFIG_KEY"] = "SAR"
@@ -231,12 +234,12 @@ def test_harvest(mock_create_client, requests_mock, mock_catalogue_response):
     runner = CliRunner()
     runner.invoke(harvest, f"workspace catalogue {bucket_name}".split())
 
-    s3 = boto3.resource("s3")
-    my_bucket = s3.Bucket(bucket_name)
+    s3_resource = boto3.resource("s3")
+    my_bucket = s3_resource.Bucket(bucket_name)
 
     assert len(list(my_bucket.objects.all())) == 4
 
-    args, kwargs = mock_producer.send.call_args
+    args, _kwargs = mock_producer.send.call_args
     call_args = json.loads(args[0])
     assert {
         "id",
@@ -256,8 +259,12 @@ def test_harvest(mock_create_client, requests_mock, mock_catalogue_response):
 @moto.mock_aws
 @patch("airbus_harvester.__main__.get_pulsar_client")
 def test_harvest_delete(
-    mock_create_client, requests_mock, mock_catalogue_response, mock_config, parameters
-):
+    mock_create_client: Any,
+    requests_mock: Any,
+    mock_catalogue_response: dict,
+    mock_config: dict,
+    parameters: dict,
+) -> None:
     requests_mock.get(
         "https://sar.api.oneatlas.airbus.com/v1/sar/catalogue/replication",
         text=json.dumps(mock_catalogue_response),
@@ -285,20 +292,20 @@ def test_harvest_delete(
             temp_file.flush()
 
         # Create S3 resources and upload file to S3
-        s3 = boto3.client("s3", region_name="us-east-1")
-        s3.create_bucket(Bucket=bucket_name)
-        s3.upload_file(
+        s3_client: Any = boto3.client("s3", region_name="us-east-1")
+        s3_client.create_bucket(Bucket=bucket_name)
+        s3_client.upload_file(
             local_file_path,
             bucket_name,
             f"harvested-metadata/{mock_config['collection_name']}",
         )
-        s3.upload_file(
+        s3_client.upload_file(
             local_file_path,  # any example file
             bucket_name,
             "git-harvester/some/file/key/to/delete.json",
         )
-        s3 = boto3.resource("s3")
-        my_bucket = s3.Bucket(bucket_name)
+        s3_resource: Any = boto3.resource("s3")
+        my_bucket = s3_resource.Bucket(bucket_name)
         assert len(list(my_bucket.objects.all())) == 2
 
     os.environ["PULSAR_URL"] = "mypulsar.com/pulsar"
@@ -309,7 +316,7 @@ def test_harvest_delete(
 
     assert len(list(my_bucket.objects.all())) == 4
 
-    args, kwargs = mock_producer.send.call_args
+    args, _kwargs = mock_producer.send.call_args
     call_args = json.loads(args[0])
     assert {
         "id",
@@ -327,7 +334,7 @@ def test_harvest_delete(
     assert len(call_args["deleted_keys"]) == 1
 
 
-def test__coordinates_to_bbox__success(mock_response):
+def test__coordinates_to_bbox__success(mock_response: dict) -> None:
     coordinates = mock_response["features"][0]["geometry"]["coordinates"]
     expected_bbox = [-28.1373002, 38.5878242, -27.9837603, 38.7135605]
 
@@ -336,7 +343,7 @@ def test__coordinates_to_bbox__success(mock_response):
     assert expected_bbox == actual_bbox
 
 
-def test_get_stac_collection_summary(mock_data, mock_response):
+def test_get_stac_collection_summary(mock_data: dict, mock_response: dict) -> None:
     expected_summary = {
         "bbox": [-27.9837603, 38.6070725, -27.9837603, 38.6070725],
         "start_time": mock_response["features"][0]["properties"]["startTime"],
@@ -348,7 +355,7 @@ def test_get_stac_collection_summary(mock_data, mock_response):
     assert actual_summary == expected_summary
 
 
-def test_generate_stac_collection(mock_data, mock_config):
+def test_generate_stac_collection(mock_data: dict, mock_config: dict) -> None:
     mock_data_summary = {
         "bbox": [1, 2, 3, 4],
         "start_time": "2024-01-22T19:42:44.735Z",
@@ -375,18 +382,16 @@ def test_generate_stac_collection(mock_data, mock_config):
     }.issubset(set(actual_collection.keys()))
 
 
-def test_handle_external_url__with_quicklook(mock_config):
+def test_handle_external_url__with_quicklook(mock_config: dict) -> None:
     external_url = mock_config["external_urls"][0]
 
-    mapped_keys = set()
-    links = []
-    assets = {}
+    mapped_keys: set[str] = set()
+    links: list[dict] = []
+    assets: dict[str, dict] = {}
 
     data = {"properties": {"quicklookUrl": "www.test.com"}}
 
-    handle_external_url(
-        data, links, assets, mapped_keys, external_url["name"], external_url["path"]
-    )
+    handle_external_url(data, links, assets, mapped_keys, external_url["name"], external_url["path"])
 
     assert len(assets) == len(mapped_keys) == 1
     assert len(links) == 0
@@ -394,24 +399,22 @@ def test_handle_external_url__with_quicklook(mock_config):
     assert {"href", "type"}.issubset(assets["thumbnail"].keys())
 
 
-def test_handle_external_url__without_quicklook(mock_config):
+def test_handle_external_url__without_quicklook(mock_config: dict) -> None:
     external_url = mock_config["external_urls"][0]
 
-    mapped_keys = set()
-    links = []
-    assets = {}
+    mapped_keys: set[str] = set()
+    links: list[dict] = []
+    assets: dict[str, dict] = {}
 
     data = {"properties": {"notQuicklookUrl": "www.test.com"}}
 
-    handle_external_url(
-        data, links, assets, mapped_keys, external_url["name"], external_url["path"]
-    )
+    handle_external_url(data, links, assets, mapped_keys, external_url["name"], external_url["path"])
 
     assert len(assets) == len(links) == len(mapped_keys) == 0
 
 
 @pytest.mark.parametrize(
-    "key, value, expected_return_value",
+    ("key", "value", "expected_return_value"),
     [
         pytest.param("any", "any", "any", id="any"),
         pytest.param("lookDirection", "R", "right", id="lookDirection_R"),
@@ -422,13 +425,13 @@ def test_handle_external_url__without_quicklook(mock_config):
         pytest.param("polarizationChannels", "HHVV", ["HH", "VV"], id="polarizationChannels"),
     ],
 )
-def test_modify_value(key, value, expected_return_value):
+def test_modify_value(key: str, value: str, expected_return_value: Any) -> None:
     actual_return_value = modify_value(key, value)
 
     assert expected_return_value == actual_return_value
 
 
-def test_generate_stac_item(mock_response, mock_config):
+def test_generate_stac_item(mock_response: dict, mock_config: dict) -> None:
     actual_item = generate_stac_item(mock_response["features"][0], mock_config)
     json_collection = actual_item
 
@@ -447,7 +450,7 @@ def test_generate_stac_item(mock_response, mock_config):
     }.issubset(set(json_collection.keys()))
 
 
-def test_make_catalogue():
+def test_make_catalogue() -> None:
     expected_catalogue = {
         "type": "Catalog",
         "id": "airbus",
@@ -461,7 +464,7 @@ def test_make_catalogue():
     assert actual_catalogue == expected_catalogue
 
 
-def test_add_to_all_data_summary(mock_response):
+def test_add_to_all_data_summary(mock_response: dict) -> None:
     data = {
         "type": "Feature",
         "geometry": {
@@ -481,7 +484,7 @@ def test_add_to_all_data_summary(mock_response):
             "end_datetime": "2024-01-22T19:42:46.446Z",
         },
     }
-    all_data = {"coordinates": [], "start_time": [], "stop_time": []}
+    all_data: dict[str, list] = {"coordinates": [], "start_time": [], "stop_time": []}
 
     all_data = add_to_catalogue_data_summary(all_data, data)
 
@@ -491,9 +494,10 @@ def test_add_to_all_data_summary(mock_response):
 
 
 @pytest.mark.parametrize(
-    "first,second,expected", [({"a": 1, "b": 2, "c": 3}, {"a": 10, "d": 2, "e": 3}, ["d", "e"])]
+    ("first", "second", "expected"),
+    [({"a", "b", "c"}, {"a": 10, "d": 2, "e": 3}, ["d", "e"])],
 )
-def test_find_deleted_keys(first, second, expected):
+def test_find_deleted_keys(first: set, second: dict, expected: list) -> None:
     actual = find_deleted_keys(first, second)
 
     assert set(actual) == set(expected)
