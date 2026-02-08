@@ -5,6 +5,9 @@ ENV UV_NO_DEV=1
 
 WORKDIR /app
 
+# Install git (needed for git dependencies)
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+
 # Install dependencies
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
