@@ -20,7 +20,8 @@ After updating the catalogue, the harvester sends a message to the upstream "har
 
 ### Prerequisites
 
-- Python 3.12+
+- Python 3.13
+- [uv](https://docs.astral.sh/uv/)
 - GNU Make
 - AWS credentials (for S3 access)
 - Access to Pulsar (for messaging)
@@ -31,15 +32,14 @@ After updating the catalogue, the harvester sends a message to the upstream "har
 Clone the repository and run the setup using the Makefile:
 
 ```sh
-git clone https://github.com/EO-Datahub/airbus-harvester.git
+git clone https://github.com/EO-DataHub/airbus-harvester.git
 cd airbus-harvester
 make setup
 ```
 
 This will:
 
-- Create a virtual environment (`venv`)
-- Build and install requirements from `pyproject.toml`
+- Install dependencies via `uv sync`
 - Install pre-commit hooks
 
 You can safely run `make setup` repeatedly; it will only update things if needed.
@@ -88,15 +88,16 @@ python -m airbus_harvester default_workspace catalog catalogue-population-eodhp
 ## Development
 
 - Code is in `airbus_harvester`.
-- Formatting: [Black](https://black.readthedocs.io/), [Ruff](https://docs.astral.sh/ruff/), [isort](https://pycqa.github.io/isort/).
-- Linting: [Pylint](https://pylint.pycqa.org/).
+- Formatting and linting: [Ruff](https://docs.astral.sh/ruff/).
+- Type checking: [Pyright](https://github.com/microsoft/pyright).
 - Pre-commit checks are installed with `make setup`.
 
 Useful Makefile targets:
 
-- `make test`: Run tests continuously
+- `make test`: Run tests continuously (via pytest-watcher)
 - `make testonce`: Run tests once
-- `make lint`: Lint and reformat code
+- `make format`: Auto-format and fix lint issues
+- `make check`: Run all checks (ruff, pyright, validate-pyproject)
 - `make dockerbuild`: Build a Docker image
 - `make dockerpush`: Push a Docker image
 
@@ -126,12 +127,12 @@ Check logs for detailed error messages.
 The release process is fully automated and handled through GitHub Actions.  
 On every push to `main` or when a new tag is created, the following checks and steps are run automatically:
 
-- Pre-commit checks and linting
+- QA checks (ruff, pyright)
 - Security scanning
 - Unit tests
 - Docker image build and push to the configured registry
 
-Versioned releases are handled through the Releases page in github.
+Versioned releases are handled through the Releases page in GitHub.
 
 See [`.github/workflows/actions.yaml`](.github/workflows/actions.yaml) for details.
 

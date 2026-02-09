@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 import json
-from typing import Sequence
+from collections.abc import Sequence
+from typing import Any, cast
 
 from eodhp_utils.messagers import Messager
 
 
-class AirbusHarvesterMessager(Messager[str]):
+class AirbusHarvesterMessager(Messager[dict]):
     """
     Loads STAC files harvested from the Planet API into an S3 bucket with file key relating to the
     owning catalog combined with the file path in the external catalogue.
@@ -13,7 +16,6 @@ class AirbusHarvesterMessager(Messager[str]):
     """
 
     def process_msg(self, msg: dict) -> Sequence[Messager.Action]:
-
         action_list = []
         harvested_data = msg["harvested_data"]
         deleted_keys = msg["deleted_keys"]
@@ -29,13 +31,13 @@ class AirbusHarvesterMessager(Messager[str]):
             action_list.append(action)
 
         for key in deleted_keys:
-            # return action to delete file from S3
-            action = Messager.OutputFileAction(file_body=None, cat_path=key)
+            # return action to delete file from S3 (file_body=None signals deletion per upstream docs)
+            action = Messager.OutputFileAction(file_body=cast(str, None), cat_path=key)
             action_list.append(action)
 
         return action_list
 
-    def gen_empty_catalogue_message(self, msg):
+    def gen_empty_catalogue_message(self, msg: Any) -> dict:
         return {
             "id": "harvester/airbus",
             "workspace": "default_workspace",

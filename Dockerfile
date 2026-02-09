@@ -1,18 +1,24 @@
 # syntax=docker/dockerfile:1
-FROM python:3.12-slim-bullseye
+FROM ghcr.io/astral-sh/uv:python3.13-trixie-slim
 
-RUN rm -f /etc/apt/apt.conf.d/docker-clean; \
-    echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
+ENV UV_NO_DEV=1
 
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update -y && apt-get upgrade -y \
-    && apt-get install -y git
+WORKDIR /app
 
-WORKDIR /airbus-harvester
-ADD LICENSE requirements.txt ./
-ADD airbus_harvester ./airbus_harvester/
-ADD pyproject.toml ./
-RUN --mount=type=cache,target=/root/.cache/pip pip3 install -r requirements.txt .
+# Install git (needed for git dependencies)
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 
-ENTRYPOINT ["python", "-m", "airbus_harvester", "harvest"]
+# Install dependencies
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --frozen --no-install-project
+
+# Copy project files
+COPY . /app
+
+# Sync the project
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen
+
+ENTRYPOINT ["uv", "run", "--no-sync", "python", "-m", "airbus_harvester", "harvest"]
