@@ -34,29 +34,29 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "boto3" },
-    { name = "botocore" },
-    { name = "click" },
+    { name = "boto3", specifier = ">=1.42.44" },
+    { name = "botocore", specifier = ">=1.42.44" },
+    { name = "click", specifier = ">=8.3.1" },
     { name = "eodhp-utils", git = "https://github.com/EO-DataHub/eodhp-utils.git?tag=v0.1.4" },
-    { name = "inflection" },
-    { name = "pulsar-client" },
-    { name = "pystac" },
-    { name = "pystac-client" },
-    { name = "requests" },
+    { name = "inflection", specifier = ">=0.5.1" },
+    { name = "pulsar-client", specifier = ">=3.10.0" },
+    { name = "pystac", specifier = ">=1.14.3" },
+    { name = "pystac-client", specifier = ">=0.9.0" },
+    { name = "requests", specifier = ">=2.32.5" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "moto" },
-    { name = "pre-commit" },
-    { name = "pyright" },
-    { name = "pytest" },
-    { name = "pytest-mock" },
-    { name = "pytest-watcher" },
-    { name = "pytest-xdist" },
-    { name = "requests-mock" },
-    { name = "ruff" },
-    { name = "validate-pyproject" },
+    { name = "moto", specifier = ">=5.1.20" },
+    { name = "pre-commit", specifier = ">=4.5.1" },
+    { name = "pyright", specifier = ">=1.1.408" },
+    { name = "pytest", specifier = ">=9.0.2" },
+    { name = "pytest-mock", specifier = ">=3.15.1" },
+    { name = "pytest-watcher", specifier = ">=0.6.3" },
+    { name = "pytest-xdist", specifier = ">=3.8.0" },
+    { name = "requests-mock", specifier = ">=1.12.1" },
+    { name = "ruff", specifier = ">=0.15.0" },
+    { name = "validate-pyproject", specifier = ">=0.25" },
 ]
 
 [[package]]

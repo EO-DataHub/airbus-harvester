@@ -21,29 +21,29 @@ classifiers = [
   "Programming Language :: Python :: 3 :: Only",
 ]
 dependencies = [
-    "boto3",
-    "botocore",
-    "click",
+    "boto3>=1.42.44",
+    "botocore>=1.42.44",
+    "click>=8.3.1",
     "eodhp-utils",
-    "inflection",
-    "pulsar-client",
-    "pystac",
-    "pystac-client",
-    "requests",
+    "inflection>=0.5.1",
+    "pulsar-client>=3.10.0",
+    "pystac>=1.14.3",
+    "pystac-client>=0.9.0",
+    "requests>=2.32.5",
 ]
 
 [dependency-groups]
 dev = [
-    "moto",
-    "pre-commit",
-    "pyright",
-    "pytest",
-    "pytest-mock",
-    "pytest-watcher",
-    "pytest-xdist",
-    "requests-mock",
-    "ruff",
-    "validate-pyproject",
+    "moto>=5.1.20",
+    "pre-commit>=4.5.1",
+    "pyright>=1.1.408",
+    "pytest>=9.0.2",
+    "pytest-mock>=3.15.1",
+    "pytest-watcher>=0.6.3",
+    "pytest-xdist>=3.8.0",
+    "requests-mock>=1.12.1",
+    "ruff>=0.15.0",
+    "validate-pyproject>=0.25",
 ]
 
 [project.urls]
