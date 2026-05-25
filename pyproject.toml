@@ -3,7 +3,7 @@ name = "airbus-harvester"
 version = "0.1.4"
 description = "Harvest Airbus data"
 readme = "README.md"
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.14,<3.15"
 license = {file = "LICENSE"}
 authors = [
   {name = "Telespazio UK Ltd", email = "hannah.collingwood@telespazio.com"}
