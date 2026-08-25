@@ -34,9 +34,9 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "moto==5.2.1",
-    "pre-commit==4.6.0",
-    "pyright==1.1.409",
+    "moto==5.2.2",
+    "pre-commit==4.6.2",
+    "pyright==1.1.411",
     "pytest==9.1.1",
     "pytest-mock==3.15.1",
     "pytest-watcher==0.6.3",
@@ -63,7 +63,7 @@ package = true
 exclude-newer = "7 days"
 
 [tool.uv.sources]
-eodhp-utils = { git = "https://github.com/EO-DataHub/eodhp-utils.git", tag = "v0.1.4" }
+eodhp-utils = { git = "https://github.com/EO-DataHub/eodhp-utils.git", tag = "v0.1.14" }
 
 [tool.pytest.ini_options]
 addopts = ["--import-mode=importlib"]
