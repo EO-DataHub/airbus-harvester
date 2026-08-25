@@ -21,7 +21,7 @@ from requests.exceptions import ConnectionError, HTTPError, Timeout
 
 from airbus_harvester.airbus_harvester_messager import AirbusHarvesterMessager
 
-setup_logging(verbosity=2)  # DEBUG level
+setup_logging(verbosity=3)  # DEBUG level (eodhp-utils >=0.1.14: 2 is INFO, 3 is DEBUG)
 
 
 minimum_message_entries = int(os.environ.get("MINIMUM_MESSAGE_ENTRIES", 100))
@@ -445,11 +445,9 @@ def get_file_hash(data: str) -> str:
 def get_file_data(bucket: str, key: str, s3_client: Any) -> dict:
     """Read file at given S3 location and parse as JSON"""
     previously_harvested = get_file_s3(bucket, key, s3_client)
-    try:
-        previously_harvested = json.loads(previously_harvested)
-    except TypeError:
-        previously_harvested = {}
-    return previously_harvested
+    if previously_harvested is None:
+        return {}
+    return json.loads(previously_harvested)
 
 
 def coordinates_to_bbox(coordinates: list) -> list:
