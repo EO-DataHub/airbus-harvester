@@ -34,7 +34,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "moto==5.2.2",
+    "moto==5.2.3",
     "pre-commit==4.6.2",
     "pyright==1.1.411",
     "pytest==9.1.1",
@@ -42,7 +42,7 @@ dev = [
     "pytest-watcher==0.6.3",
     "pytest-xdist==3.8.0",
     "requests-mock==1.12.1",
-    "ruff==0.16.3",
+    "ruff==0.16.4",
     "validate-pyproject==0.25",
 ]
 
