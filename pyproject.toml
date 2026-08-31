@@ -43,7 +43,7 @@ dev = [
     "pytest-xdist==3.8.0",
     "requests-mock==1.12.1",
     "ruff==0.16.4",
-    "validate-pyproject==0.25",
+    "validate-pyproject==0.26",
 ]
 
 [project.urls]
