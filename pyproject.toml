@@ -42,7 +42,7 @@ dev = [
     "pytest-watcher==0.6.3",
     "pytest-xdist==3.8.0",
     "requests-mock==1.12.1",
-    "ruff==0.16.5",
+    "ruff==0.16.6",
     "validate-pyproject==0.26",
 ]
 
@@ -63,7 +63,7 @@ package = true
 exclude-newer = "7 days"
 
 [tool.uv.sources]
-eodhp-utils = { git = "https://github.com/EO-DataHub/eodhp-utils.git", tag = "v0.1.14" }
+eodhp-utils = { git = "https://github.com/EO-DataHub/eodhp-utils.git", tag = "v0.1.15" }
 
 [tool.pytest.ini_options]
 addopts = ["--import-mode=importlib"]
