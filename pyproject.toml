@@ -37,7 +37,7 @@ dev = [
     "moto==5.2.5",
     "pre-commit==4.7.0",
     "pyright==1.1.414",
-    "pytest==9.1.1",
+    "pytest==9.2.0",
     "pytest-mock==3.17.0",
     "pytest-watcher==0.6.3",
     "pytest-xdist==3.8.0",
