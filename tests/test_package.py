@@ -23,8 +23,10 @@ from airbus_harvester.__main__ import (
     get_stac_collection_summary,
     handle_external_url,
     harvest,
+    load_config,
     make_catalogue,
     modify_value,
+    next_counter_page,
 )
 
 
@@ -634,6 +636,106 @@ def test_harvest__records_without_id(mock_create_client: Any, requests_mock: Any
     assert f"{ITEMS}/CP_PHR1A_1.json" in metadata
     assert f"{ITEMS}/DS_PHR1A_0.json" in metadata
     assert not any(key.endswith(("/.json", "/None.json")) for key in metadata)
+
+
+class FakeOpenSearch:
+    """Serves records sorted by -lastUpdateDate like the OneAtlas search, up to page 50"""
+
+    def __init__(self, records: list[dict]) -> None:
+        self.records = sorted(records, key=lambda r: r["properties"]["lastUpdateDate"], reverse=True)
+        self.requests: list[dict] = []
+
+    def __call__(self, request: Any, context: Any) -> dict:
+        body = request.json()
+        self.requests.append(body)
+        assert body["startPage"] <= 50
+        records = self.records
+        if "lastUpdateDate" in body:
+            low, high = body["lastUpdateDate"].strip("[]").split(",")
+            records = [r for r in records if low <= r["properties"]["lastUpdateDate"] <= high]
+        start = (body["startPage"] - 1) * body["itemsPerPage"]
+        return {"totalResults": len(records), "features": records[start : start + body["itemsPerPage"]]}
+
+
+def small_page_config(path: str) -> Any:
+    """load_config with two records per page, so a search window holds 100 records"""
+    config = load_config(path)
+    if path.endswith("config.json"):
+        config["PHR"]["body"]["itemsPerPage"] = 2
+    return config
+
+
+@moto.mock_aws
+@patch("airbus_harvester.__main__.get_pulsar_client")
+def test_harvest__counter_pagination_reaches_every_record(mock_create_client: Any, requests_mock: Any) -> None:
+    # 150 records: the first window holds 100, the second the remaining 50 plus the boundary record.
+    # Records 95 to 104 share an update time, so they straddle the window boundary.
+    records = [optical_record(f"DS_PHR1A_{i:03}", f"2026-01-01T00:00:{150 - i:03}Z") for i in range(150)]
+    for record in records[95:105]:
+        record["properties"]["lastUpdateDate"] = "2026-01-01T00:00:050Z"
+    search = FakeOpenSearch(records)
+    requests_mock.post("https://search.foundation.api.oneatlas.airbus.com/api/v2/opensearch", json=search)
+
+    mock_client = mock.MagicMock()
+    mock_producer = mock.MagicMock()
+    mock_create_client.return_value = mock_client
+    mock_client.create_producer.return_value = mock_producer
+    s3_client: Any = boto3.client("s3", region_name="us-east-1")
+    s3_client.create_bucket(Bucket="my-bucket")
+    os.environ["PULSAR_URL"] = "mypulsar.com/pulsar"
+    os.environ["HARVESTER_CONFIG_KEY"] = "PHR"
+
+    with patch("airbus_harvester.__main__.load_config", side_effect=small_page_config):
+        result = CliRunner().invoke(harvest, ["workspace", "catalogue", "my-bucket"])
+
+    assert result.exit_code == 0, result.output
+    added = {key for call in mock_producer.send.call_args_list for key in json.loads(call.args[0])["added_keys"]}
+    assert {f"git-harvester/{ITEMS}/DS_PHR1A_{i:03}.json" for i in range(150)} <= added
+    windows = [(r["startPage"], r.get("lastUpdateDate")) for r in search.requests]
+    assert windows[49] == (50, None)
+    assert windows[50] == (1, "[2018-10-03T12:00:00Z,2026-01-01T00:00:050Z]")
+
+
+def test_next_counter_page__next_page() -> None:
+    request = {"startPage": 3, "itemsPerPage": 2}
+    features = [optical_record("a"), optical_record("b")]
+
+    assert next_counter_page(request, {"totalResults": 10}, features) == {"startPage": 4, "itemsPerPage": 2}
+
+
+@pytest.mark.parametrize(
+    ("page", "count", "total"),
+    [
+        pytest.param(1, 0, 0, id="empty"),
+        pytest.param(5, 0, 100, id="empty_page"),
+        pytest.param(5, 2, 10, id="last_full_page"),
+        pytest.param(5, 1, 9, id="last_short_page"),
+        pytest.param(50, 2, 100, id="last_page_of_window"),
+    ],
+)
+def test_next_counter_page__done(page: int, count: int, total: int) -> None:
+    features = [optical_record(str(i)) for i in range(count)]
+
+    assert next_counter_page({"startPage": page, "itemsPerPage": 2}, {"totalResults": total}, features) is None
+
+
+def test_next_counter_page__new_window() -> None:
+    request = {"startPage": 50, "itemsPerPage": 2, "lastUpdateDate": "[2018-10-03T12:00:00Z,2026-02-01T00:00:00Z]"}
+    features = [optical_record("a", "2026-01-02T00:00:00Z"), optical_record("b", "2026-01-01T00:00:00Z")]
+
+    assert next_counter_page(request, {"totalResults": 1000}, features) == {
+        "startPage": 1,
+        "itemsPerPage": 2,
+        "lastUpdateDate": "[2018-10-03T12:00:00Z,2026-01-01T00:00:00Z]",
+    }
+
+
+def test_next_counter_page__window_does_not_advance() -> None:
+    request = {"startPage": 50, "itemsPerPage": 2, "lastUpdateDate": "[2018-10-03T12:00:00Z,2026-01-01T00:00:00Z]"}
+    features = [optical_record("a", "2026-01-01T00:00:00Z"), optical_record("b", "2026-01-01T00:00:00Z")]
+
+    with pytest.raises(RuntimeError):
+        next_counter_page(request, {"totalResults": 1000}, features)
 
 
 @moto.mock_aws

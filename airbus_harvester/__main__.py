@@ -28,6 +28,9 @@ minimum_message_entries = int(os.environ.get("MINIMUM_MESSAGE_ENTRIES", 100))
 proxy_base_url = os.environ.get("PROXY_BASE_URL", "")
 max_api_retries = int(os.environ.get("MAX_API_RETRIES", 5))
 
+# The OneAtlas search only serves pages 1 to 50 of a query
+MAX_COUNTER_PAGES = 50
+
 commercial_catalogue_root = os.getenv("COMMERCIAL_CATALOGUE_ROOT", "commercial")
 
 
@@ -196,15 +199,9 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str) -> None:
                 raise AttributeError(msg_text)
             next_url = links.get("next")
         elif config["pagination_method"] == "counter":
-            if not features:
+            config["body"] = next_counter_page(config["body"], body, features)
+            if config["body"] is None:
                 next_url = None
-            else:
-                # The counter can only go up to 50. Limit the search by last update date
-                if (url_count + 1) % 50 == 0:
-                    config["body"]["lastUpdateDate"] = (
-                        f"[2018-10-03T12:00:00Z,{entry['properties']['lastUpdateDate']}]"
-                    )
-                config["body"]["startPage"] = (url_count % 50) + 1
 
         logging.info(f"Page {url_count} next URL: {next_url}")
 
@@ -284,6 +281,28 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str) -> None:
     logging.info(f"Uploading metadata to S3: {len(current_harvest_metadata)} items")
     upload_file_s3(json.dumps(current_harvest_metadata), s3_bucket, metadata_s3_key, s3_client)
     logging.info("Uploaded metadata to S3")
+
+
+def next_counter_page(request_body: dict, response: dict, features: list) -> dict | None:
+    """Request body for the next page of a counter-paginated search, or None after the last page.
+
+    The search only serves the first MAX_COUNTER_PAGES pages. After the last of those, start again at
+    page 1 with the results limited to those last updated no later than the last record seen. The
+    bound is inclusive, so records sharing that update time are not lost.
+    """
+    page = request_body["startPage"]
+    seen = (page - 1) * request_body["itemsPerPage"] + len(features)
+    total = response.get("totalResults")
+    if not features or (total is not None and seen >= total):
+        return None
+
+    if page < MAX_COUNTER_PAGES:
+        return {**request_body, "startPage": page + 1}
+
+    window = f"[2018-10-03T12:00:00Z,{features[-1]['properties']['lastUpdateDate']}]"
+    if request_body.get("lastUpdateDate") == window:
+        raise RuntimeError(f"Search window {window} did not advance")
+    return {**request_body, "startPage": 1, "lastUpdateDate": window}
 
 
 def find_deleted_keys(new: set, old: dict) -> list:
