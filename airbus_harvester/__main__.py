@@ -161,9 +161,8 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str) -> None:
         entry: dict = {}
         for entry in features:
             data = generate_stac_item(entry, config)
-            try:
-                file_name = f"{entry['properties'][config['item_id_key']]}.json"
-                key = f"{key_root}/collections/{config['collection_name']}/items/{file_name}"
+            if data["id"]:
+                key = f"{key_root}/collections/{config['collection_name']}/items/{data['id']}.json"
                 current_harvest_keys.add(key)
 
                 previous_hash = current_harvest_metadata.get(key)
@@ -176,8 +175,9 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str) -> None:
                     latest_harvested[key] = file_hash
                 else:
                     logging.info(f"Skipping: {key}")
-            except KeyError:
-                logging.error(f"Invalid entry in {next_url}")
+            else:
+                # Not harvested, but still counted in the collection extent below
+                logging.warning(f"Skipping record with no item ID: {entry['properties'].get('id')}")
 
             # Update both summaries (if an old one does exist)
             catalogue_data_summary = add_to_catalogue_data_summary(catalogue_data_summary, data)
@@ -271,6 +271,10 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str) -> None:
         del current_harvest_metadata[key]
     logging.info(f"Deleted keys removed: {len(current_harvest_metadata)} items")
 
+    # Older versions wrote records with no item ID to items/.json or items/None.json. The catalogue
+    # rejected them, so drop them from the state without sending a delete.
+    deleted_keys = [key for key in deleted_keys if not is_placeholder_item_key(key)]
+
     # Send message for altered keys
     msg = {"harvested_data": harvested_data, "deleted_keys": deleted_keys}
 
@@ -285,6 +289,30 @@ def harvest(workspace_name: str, catalog: str, s3_bucket: str) -> None:
 def find_deleted_keys(new: set, old: dict) -> list:
     """Find differences between two dictionaries"""
     return list(set(old).difference(new))
+
+
+def is_placeholder_item_key(key: str) -> bool:
+    """True for item keys that older versions wrote for records with an empty or null item ID"""
+    return key.endswith(("/items/.json", "/items/None.json"))
+
+
+def get_item_id(data: dict, config: dict) -> str | None:
+    """STAC item ID for an Airbus record, or None if the record should be skipped.
+
+    Coupling (stereo and tri-stereo) records that Airbus publishes with an empty item_id_key value
+    use coupling_item_id_key instead. Other records without an ID are left out: in the PHR archive
+    they are older copies of images that are also published with an ID.
+    """
+    properties = data["properties"]
+    item_id = properties.get(config["item_id_key"])
+    if item_id:
+        return item_id
+
+    coupling_key = config.get("coupling_item_id_key")
+    if coupling_key and properties.get("productCategory") == "coupling":
+        return properties.get(coupling_key) or None
+
+    return None
 
 
 def compare_to_previous_version(
@@ -552,7 +580,7 @@ def modify_value(key: str, value: Any) -> Any:
 
 def generate_stac_item(data: dict, config: dict) -> dict:
     """Catalogue items for Airbus data"""
-    item_id = data["properties"][config["item_id_key"]]
+    item_id = get_item_id(data, config)
     logging.info(f"Processing item {item_id}")
 
     coordinates = data["geometry"]["coordinates"][0]

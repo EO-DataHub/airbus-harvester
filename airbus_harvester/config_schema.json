@@ -68,6 +68,10 @@
             "type": "string",
             "description": "Key within the API response to be used as the STAC item ID."
         },
+        "coupling_item_id_key": {
+            "type": "string",
+            "description": "Key used as the STAC item ID for coupling records whose item_id_key value is empty."
+        },
         "pagination_method": {
             "type": "string",
             "description": "Method used for pagination in the API.",

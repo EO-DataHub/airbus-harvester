@@ -18,6 +18,8 @@ from airbus_harvester.__main__ import (
     find_deleted_keys,
     generate_stac_collection,
     generate_stac_item,
+    get_file_hash,
+    get_item_id,
     get_stac_collection_summary,
     handle_external_url,
     harvest,
@@ -501,3 +503,152 @@ def test_find_deleted_keys(first: set, second: dict, expected: list) -> None:
     actual = find_deleted_keys(first, second)
 
     assert set(actual) == set(expected)
+
+
+def optical_record(item_id: str | None, last_update: str = "2026-01-01T00:00:00Z", **properties: Any) -> dict:
+    """A OneAtlas opensearch record with the fields the harvester reads"""
+    return {
+        "type": "Feature",
+        "geometry": {"type": "Polygon", "coordinates": [[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 0.0]]]},
+        "properties": {
+            "acquisitionIdentifier": item_id,
+            "sourceIdentifier": item_id,
+            "acquisitionDate": "2026-01-01T00:00:00Z",
+            "lastUpdateDate": last_update,
+            "productCategory": "image",
+            "id": f"uuid-{item_id}",
+            **properties,
+        },
+        "_links": {},
+    }
+
+
+def coupling_record(source_id: str, last_update: str = "2026-01-01T00:00:00Z") -> dict:
+    return optical_record(
+        "", last_update, sourceIdentifier=source_id, productCategory="coupling", id=f"uuid-{source_id}"
+    )
+
+
+def phr_config() -> dict:
+    with open("airbus_harvester/config.json") as f:
+        return json.load(f)["PHR"]
+
+
+@pytest.mark.parametrize(
+    ("record", "expected"),
+    [
+        pytest.param(optical_record("DS_PHR1A_1"), "DS_PHR1A_1", id="image"),
+        pytest.param(coupling_record("CP_PHR1A_1_ST_0-43"), "CP_PHR1A_1_ST_0-43", id="coupling_empty_id"),
+        pytest.param(
+            optical_record("ACQ_CP_PHR1A_1", sourceIdentifier="CP_PHR1A_1", productCategory="coupling"),
+            "ACQ_CP_PHR1A_1",
+            id="coupling_with_id",
+        ),
+        pytest.param(optical_record(None, sourceIdentifier="DS_PHR1A_1"), None, id="image_null_id"),
+        pytest.param(optical_record("", sourceIdentifier="DS_PHR1A_1"), None, id="image_empty_id"),
+        pytest.param(coupling_record(""), None, id="coupling_no_source_id"),
+    ],
+)
+def test_get_item_id(record: dict, expected: str | None) -> None:
+    assert get_item_id(record, phr_config()) == expected
+
+
+def test_get_item_id__no_coupling_key(mock_config: dict) -> None:
+    record = {"properties": {"acquisitionId": "", "productCategory": "coupling", "sourceIdentifier": "CP_1"}}
+
+    assert get_item_id(record, mock_config) is None
+
+
+def test_generate_stac_item__coupling_with_empty_id() -> None:
+    item = generate_stac_item(coupling_record("CP_PHR1A_1_ST_0-43"), phr_config())
+
+    assert item["id"] == "CP_PHR1A_1_ST_0-43"
+    assert item["properties"]["source_identifier"] == "CP_PHR1A_1_ST_0-43"
+    assert "acquisition_identifier" not in item["properties"]
+
+
+def run_phr_harvest(pages: list[dict], previous_metadata: dict, requests_mock: Any, mock_create_client: Any) -> tuple:
+    """Run the PHR harvest against a fake search that serves the given pages in order"""
+    requests_mock.post(
+        "https://search.foundation.api.oneatlas.airbus.com/api/v2/opensearch",
+        [{"text": json.dumps(page)} for page in pages],
+    )
+    mock_client = mock.MagicMock()
+    mock_producer = mock.MagicMock()
+    mock_create_client.return_value = mock_client
+    mock_client.create_producer.return_value = mock_producer
+
+    bucket_name = "my-bucket"
+    s3_client: Any = boto3.client("s3", region_name="us-east-1")
+    s3_client.create_bucket(Bucket=bucket_name)
+    s3_client.put_object(
+        Bucket=bucket_name, Key="harvested-metadata/airbus_phr_data", Body=json.dumps(previous_metadata)
+    )
+
+    os.environ["PULSAR_URL"] = "mypulsar.com/pulsar"
+    os.environ["HARVESTER_CONFIG_KEY"] = "PHR"
+    result = CliRunner().invoke(harvest, f"workspace catalogue {bucket_name}".split())
+
+    messages = [json.loads(call.args[0]) for call in mock_producer.send.call_args_list]
+    metadata = json.loads(
+        s3_client.get_object(Bucket=bucket_name, Key="harvested-metadata/airbus_phr_data")["Body"].read()
+    )
+    return result, messages, metadata
+
+
+ITEMS = "commercial/catalogs/airbus/collections/airbus_phr_data/items"
+
+
+@moto.mock_aws
+@patch("airbus_harvester.__main__.get_pulsar_client")
+def test_harvest__records_without_id(mock_create_client: Any, requests_mock: Any) -> None:
+    records = [
+        optical_record("DS_PHR1A_1", "2026-01-04T00:00:00Z"),
+        coupling_record("CP_PHR1A_1", "2026-01-03T00:00:00Z"),
+        coupling_record("CP_PHR1A_2", "2026-01-02T00:00:00Z"),
+        optical_record(None, "2026-01-01T00:00:00Z", sourceIdentifier="DS_PHR1A_1"),
+    ]
+    pages = [
+        {"totalResults": len(records), "features": records},
+        {"totalResults": len(records), "features": []},
+    ]
+    unchanged = optical_record("DS_PHR1A_0", "2026-01-05T00:00:00Z")
+    records.insert(0, unchanged)
+    previous_metadata = {
+        f"{ITEMS}/.json": "hash",
+        f"{ITEMS}/None.json": "hash",
+        f"{ITEMS}/DS_PHR1A_gone.json": "hash",
+        f"{ITEMS}/DS_PHR1A_0.json": get_file_hash(json.dumps(generate_stac_item(unchanged, phr_config()))),
+    }
+
+    result, messages, metadata = run_phr_harvest(pages, previous_metadata, requests_mock, mock_create_client)
+
+    assert result.exit_code == 0, result.output
+    added = {key for message in messages for key in message["added_keys"]}
+    deleted = {key for message in messages for key in message["deleted_keys"]}
+    sent_items = f"git-harvester/{ITEMS}"
+    assert {f"{sent_items}/DS_PHR1A_1.json", f"{sent_items}/CP_PHR1A_1.json", f"{sent_items}/CP_PHR1A_2.json"} <= added
+    assert not any(key.endswith(("/.json", "/None.json")) for key in added)
+    assert f"{sent_items}/DS_PHR1A_0.json" not in added
+    assert deleted == {f"{sent_items}/DS_PHR1A_gone.json"}
+    assert f"{ITEMS}/CP_PHR1A_1.json" in metadata
+    assert f"{ITEMS}/DS_PHR1A_0.json" in metadata
+    assert not any(key.endswith(("/.json", "/None.json")) for key in metadata)
+
+
+@moto.mock_aws
+@patch("airbus_harvester.__main__.get_pulsar_client")
+def test_harvest__first_page_without_ids(mock_create_client: Any, requests_mock: Any) -> None:
+    skipped = [optical_record(None, "2026-01-02T00:00:00Z", sourceIdentifier=f"DS_{i}") for i in range(3)]
+    kept = optical_record("DS_PHR1A_1", "2026-01-01T00:00:00Z")
+    pages = [
+        {"totalResults": 6, "features": skipped},
+        {"totalResults": 6, "features": [kept]},
+        {"totalResults": 6, "features": []},
+    ]
+
+    result, messages, _metadata = run_phr_harvest(pages, {}, requests_mock, mock_create_client)
+
+    assert result.exit_code == 0, result.output
+    added = {key for message in messages for key in message["added_keys"]}
+    assert f"git-harvester/{ITEMS}/DS_PHR1A_1.json" in added
