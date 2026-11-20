@@ -84,6 +84,7 @@
             "https://stac-extensions.github.io/view/v1.0.0/schema.json"
         ],
         "item_id_key": "acquisitionIdentifier",
+        "coupling_item_id_key": "sourceIdentifier",
         "pagination_method": "counter"
     },
     "PHR": {
@@ -131,6 +132,7 @@
             "https://stac-extensions.github.io/view/v1.0.0/schema.json"
         ],
         "item_id_key": "acquisitionIdentifier",
+        "coupling_item_id_key": "sourceIdentifier",
         "pagination_method": "counter"
     },
     "PNEO": {
@@ -180,6 +182,7 @@
             "https://stac-extensions.github.io/view/v1.0.0/schema.json"
         ],
         "item_id_key": "acquisitionIdentifier",
+        "coupling_item_id_key": "sourceIdentifier",
         "pagination_method": "counter"
     }
 }
