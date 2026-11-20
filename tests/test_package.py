@@ -542,6 +542,11 @@ def phr_config() -> dict:
         pytest.param(optical_record("DS_PHR1A_1"), "DS_PHR1A_1", id="image"),
         pytest.param(coupling_record("CP_PHR1A_1_ST_0-43"), "CP_PHR1A_1_ST_0-43", id="coupling_empty_id"),
         pytest.param(
+            optical_record("UNSET", sourceIdentifier="CP_PHR1A_1", productCategory="coupling"),
+            "CP_PHR1A_1",
+            id="coupling_unset_id",
+        ),
+        pytest.param(
             optical_record("ACQ_CP_PHR1A_1", sourceIdentifier="CP_PHR1A_1", productCategory="coupling"),
             "ACQ_CP_PHR1A_1",
             id="coupling_with_id",

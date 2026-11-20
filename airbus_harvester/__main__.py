@@ -318,13 +318,13 @@ def is_placeholder_item_key(key: str) -> bool:
 def get_item_id(data: dict, config: dict) -> str | None:
     """STAC item ID for an Airbus record, or None if the record should be skipped.
 
-    Coupling (stereo and tri-stereo) records that Airbus publishes with an empty item_id_key value
-    use coupling_item_id_key instead. Other records without an ID are left out: in the PHR archive
-    they are older copies of images that are also published with an ID.
+    Coupling (stereo and tri-stereo) records that Airbus publishes with an empty or "UNSET"
+    item_id_key value use coupling_item_id_key instead. Other records without an ID are left out: in
+    the PHR archive they are older copies of images that are also published with an ID.
     """
     properties = data["properties"]
     item_id = properties.get(config["item_id_key"])
-    if item_id:
+    if item_id and item_id != "UNSET":
         return item_id
 
     coupling_key = config.get("coupling_item_id_key")
